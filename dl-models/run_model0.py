@@ -18,3 +18,5 @@ dec_a_test = autoenc_a.decoder(enc_a_test).numpy()
 import plot as p
 p.plot_h6(a_test, dec_a_test,0,10)
 p.plot_h6(a_test, dec_a_test,100,10)
+p.plot_h6(a_test, dec_a_test,250,10)
+p.plot_h6(a_test, dec_a_test,350,10)
