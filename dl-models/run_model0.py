@@ -14,9 +14,12 @@ enc_a = autoenc_a.encoder(a).numpy()
 dec_a = autoenc_a.decoder(enc_a).numpy()
 enc_a_test = autoenc_a.encoder(a_test).numpy()
 dec_a_test = autoenc_a.decoder(enc_a_test).numpy()
-# plot the result
+# plot results for local histograms
 import plot as p
-p.plot_h6(a_test, dec_a_test,0,10)
-p.plot_h6(a_test, dec_a_test,100,10)
-p.plot_h6(a_test, dec_a_test,250,10)
-p.plot_h6(a_test, dec_a_test,350,10)
+p.plot_h6_f(a_test, dec_a_test,0,10,'t1.png')
+p.plot_h6_f(a_test, dec_a_test,100,10, 't2.png')
+p.plot_h6_f(a_test, dec_a_test,250,10, 't3.png')
+p.plot_h6_f(a_test, dec_a_test,350,10, 't4.png')
+# plot results for global histograms
+p.plot_h1_f(g_test, dec_g_test,0,10, 'tg1.png')
+p.plot_h1_f(g_test, dec_g_test,100,10, 'tg2.png')
