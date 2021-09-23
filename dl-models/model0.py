@@ -63,7 +63,7 @@ def auto_encoder(loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
 		X_train_hist, X_test_hist, X_train_range, X_test_range, y_train_card, y_test_card = train_test_split(a, r, b, test_size=0.2)
 		# training
 		print("Training Autoencoder local...")
-		ae_loc.fit(X_train_hist, X_train_hist, epochs=30, shuffle=True, validation_data=(X_test_hist, X_test_hist))
+		ae_loc.fit(X_train_hist, X_train_hist, batch_size=16, epochs=30, shuffle=True, validation_data=(X_test_hist, X_test_hist))
 	else:
 		print("Skip local autoencoder")
 	if (glo == 1):
@@ -79,7 +79,7 @@ def auto_encoder(loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
 		X_train_global, X_test_global = train_test_split(g, test_size=0.2)
 		# training
 		print("Training Autoencoder global...")
-		ae_glo.fit(X_train_global, X_train_global, epochs=30, shuffle=True, validation_data=(X_test_global, X_test_global))
+		ae_glo.fit(X_train_global, X_train_global, batch_size=16, epochs=30, shuffle=True, validation_data=(X_test_global, X_test_global))
 	else:
 		print("Skip global autoencoder")
 	if (loc == 1):
