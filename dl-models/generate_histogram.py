@@ -41,19 +41,34 @@ def generate(num,dimx,dimy,dimz,type):
 		leny = rd.random()*0.2
 		dy = 0.1*leny
 		area = lenx*leny
-		dia = math.ceil(num/5)*rd.random()
+		dia = math.ceil(dimx/5)*rd.random()
 		pnt = rd.randint(50,100000)
 		deltapnt = math.ceil(0.1*pnt)
 		size = rd.randint(100,10000)
 		deltasize = math.ceil(0.1*size)
+		vert = math.ceil(dimy*rd.random())
+		diav = math.ceil(dimy/5)*rd.random()
+		horiz = math.ceil(dimx*rd.random())
+		diah = math.ceil(dimx/5)*rd.random()
 		for j in range(dimx):
 			for k in range(dimy):
 				if (type == 0): # UNIFORM DISTRIBUTION
 					a[i,j,k] = cell_mod(dimz,card,delta,lenx,dx,leny,dy,area,dia,pnt,deltapnt,size,deltasize)
 				if (type == 1 and abs(j-k) < dia): # DIAGONAL DISTRIBUTION
 					a[i,j,k] = cell_mod(dimz,card,delta,lenx,dx,leny,dy,area,dia,pnt,deltapnt,size,deltasize)
-				if (type == 2 and (i % 2 == 0 or abs(j-k) < 5)): # MIX
+				if (type == 2 and (abs(k-vert) < diaiv)): # VERTICAL DISTR
 					a[i,j,k] = cell_mod(dimz,card,delta,lenx,dx,leny,dy,area,dia,pnt,deltapnt,size,deltasize)
+				if (type == 3 and (abs(j-horiz) < diah)): # HORIZONTAL DISTR
+					a[i,j,k] = cell_mod(dimz,card,delta,lenx,dx,leny,dy,area,dia,pnt,deltapnt,size,deltasize)
+				if (type == 4 and (abs(j-horiz) < diah) and (abs(k-vert) < diav)): # GAUSSIAN DISTR
+					a[i,j,k] = cell_mod1(dimz,card,delta,lenx,dx,leny,dy,area,dia,pnt,deltapnt,size,deltasize)
+				if (type == 5): # MIX
+					if (i % 5 == 0) or \
+					   (i % 5 == 1 and (abs(j-k) < dia)) or \
+					   (i % 5 == 2 and (abs(k-vert) < diav)) or \
+					   (i % 5 == 3 and (abs(j-horiz) < diah)) or \
+					   (i % 5 == 4 and (abs(j-horiz) < diah) and (abs(k-vert) < diav)):
+						a[i,j,k] = cell_mod(dimz,card,delta,lenx,dx,leny,dy,area,dia,pnt,deltapnt,size,deltasize)
 	if (debug == 1):
 		for i in range(num):
 			count = 0
