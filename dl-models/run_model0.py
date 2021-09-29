@@ -1,9 +1,9 @@
 import model0 as m
-a,g,b,r = m.create_h(2500,128,128,6,1,2)
+a,g,b,r = m.create_h(2500,128,128,6,1,5)
 # local histograms
-autoenc_a, a_train, a_test = m.auto_encoder(1,0,128,128,6,1024,128,a,g,b,r)
+autoenc_a, a_train, a_test = m.auto_encoder(1,0,128,128,6,2048,128,a,g,b,r)
 # global histograms
-autoenc_g, g_train, g_test = m.auto_encoder(0,1,128,128,6,1024,128,a,g,b,r)
+autoenc_g, g_train, g_test = m.auto_encoder(0,1,128,128,6,2048,128,a,g,b,r)
 # enc dec global
 enc_g = autoenc_g.encoder(g).numpy()
 dec_g = autoenc_g.decoder(enc_g).numpy()

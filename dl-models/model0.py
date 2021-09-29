@@ -6,6 +6,7 @@ from tensorflow.keras import layers, losses
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 import generate_histogram as gh
+import myAutoencoder as enc
 #
 # generation of random training set
 # a: local histograms
@@ -35,25 +36,32 @@ def create_h(n,dimx,dimy,dimz,norm_type,distr):
 	# outliers can be outside the range
 	if (norm_type == 0):
 		print("Standardizing data...")
-		a_scaled, g_scaled, b_scaled = gh.std(a,g,b)
+		a_scaled = gh.std_a(a)
+		g_scaled = gh.std_g(g)
+		b_scaled = gh.std_b(b)
 	else:
 		print("Normalizing data...")
-		a_scaled, g_scaled, b_scaled = gh.nor(a,g,b)
+		a_scaled = gh.nor_a(a)
+		g_scaled = gh.nor_g(g)
+		b_scaled = gh.nor_b(b)
 	return a_scaled, g_scaled, b_scaled, r
 
 # model definition
 
 # Autoencoder
-def auto_encoder(loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
-	import myAutoencoder as enc
+def auto_encoder(type,loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
 	#dimx = 128
 	#dimy = 128
 	#dimz = 6
 	if (loc == 1):
 		latent_dim = ldim_loc
-		print("Inizilizing Autoencoder local...")
 		print("Embedding dim: ", latent_dim)
-		ae_loc = enc.Autoencoder_local(latent_dim,dimx,dimy,dimz)
+		if (type == 0):
+			print("Inizilizing Autoencoder DENSE local...")
+			ae_loc = enc.Autoencoder_local(latent_dim,dimx,dimy,dimz)
+		else:
+			print("Inizilizing Autoencoder CNN local...")
+			ae_loc = enc.AutoencoderCNN_local(latent_dim,dimx,dimy,dimz)
 		ae_loc.compile(optimizer='adam', loss=losses.MeanSquaredError())
 		#ae_loc.compile(optimizer='adam', loss='binary_crossentropy')
 
@@ -63,14 +71,18 @@ def auto_encoder(loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
 		X_train_hist, X_test_hist, X_train_range, X_test_range, y_train_card, y_test_card = train_test_split(a, r, b, test_size=0.2)
 		# training
 		print("Training Autoencoder local...")
-		ae_loc.fit(X_train_hist, X_train_hist, batch_size=16, epochs=30, shuffle=True, validation_data=(X_test_hist, X_test_hist))
+		ae_loc.fit(X_train_hist, X_train_hist, batch_size=64, epochs=20, shuffle=True, validation_data=(X_test_hist, X_test_hist))
 	else:
 		print("Skip local autoencoder")
 	if (glo == 1):
 		latent_dim = ldim_glo
-		print("Inizilizing Autoencoder global...")
 		print("Embedding dim: ", latent_dim)
-		ae_glo = enc.Autoencoder_global(latent_dim,dimx,dimy)
+		if (type == 0):
+			print("Inizilizing Autoencoder DENSE global...")
+			ae_glo = enc.Autoencoder_global(latent_dim,dimx,dimy)
+		else:
+			print("Inizilizing Autoencoder CNN global...")
+			ae_glo = enc.AutoencoderCNN_global(latent_dim,dimx,dimyi,1)
 		ae_glo.compile(optimizer='adam', loss=losses.MeanSquaredError())
 		#ae_glo.compile(optimizer='adam', loss='binary_crossentropy')
 		# splitting train and test 0.2
@@ -79,7 +91,7 @@ def auto_encoder(loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
 		X_train_global, X_test_global = train_test_split(g, test_size=0.2)
 		# training
 		print("Training Autoencoder global...")
-		ae_glo.fit(X_train_global, X_train_global, batch_size=16, epochs=30, shuffle=True, validation_data=(X_test_global, X_test_global))
+		ae_glo.fit(X_train_global, X_train_global, batch_size=32, epochs=20, shuffle=True, validation_data=(X_test_global, X_test_global))
 	else:
 		print("Skip global autoencoder")
 	if (loc == 1):

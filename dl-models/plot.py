@@ -1,4 +1,11 @@
 import matplotlib.pyplot as plt
+def plot_freq(f):
+  max = 0
+  for k in range(f.shape[0]):
+    if (f[k] > max):
+      max = f[k]
+  for k in range(f.shape[0]):
+    print('{0:5d} {1} {2}'.format(k, '+' * int(f[k]/max*50), f[k]))
 def plot_orig_f(orig,start,n,file):
   plt.figure(figsize=(20, 4))
   for i in range(n):
@@ -15,6 +22,16 @@ def plot_orig(orig,start,n):
     # display original
     ax = plt.subplot(2, n, i + 1)
     plt.imshow(orig[start+i])
+    plt.title("original ["+str(start+i)+"]")
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+  plt.show()
+def plot_orig_scale(s,orig,start,n):
+  plt.figure(figsize=(20, 4))
+  for i in range(n):
+    # display original
+    ax = plt.subplot(2, n, i + 1)
+    plt.imshow(orig[start+i]*s)
     plt.title("original ["+str(start+i)+"]")
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
