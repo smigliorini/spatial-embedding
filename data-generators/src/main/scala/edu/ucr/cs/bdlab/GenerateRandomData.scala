@@ -15,6 +15,7 @@
  */
 package edu.ucr.cs.bdlab
 
+import edu.ucr.cs.bdlab.beast.generator.SpatialGenerator
 import edu.ucr.cs.bdlab.beast.operations.GriddedSummary
 import edu.ucr.cs.bdlab.davinci.SingleLevelPlot
 import org.apache.hadoop.fs.{Path, PathFilter}
@@ -111,6 +112,7 @@ object GenerateRandomData {
             .config(UniformDistribution.MaxSize, s"${randomDouble(random, boxSizes)}")
             .config(UniformDistribution.NumSegments, s"${random.nextInt(numSegments(1) - numSegments(0)) + numSegments(0)}")
             .config(UniformDistribution.GeometryType, "polygon")
+            .config(SpatialGenerator.Seed, i)
             .distribution(distribution)
           distribution match {
             case BitDistribution =>
