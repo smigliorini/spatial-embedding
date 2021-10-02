@@ -16,9 +16,11 @@
 package edu.ucr.cs.bdlab
 
 import edu.ucr.cs.bdlab.beast.generator.SpatialGenerator
+import edu.ucr.cs.bdlab.beast.geolite.IFeature
 import edu.ucr.cs.bdlab.beast.operations.GriddedSummary
 import edu.ucr.cs.bdlab.davinci.SingleLevelPlot
 import org.apache.hadoop.fs.{Path, PathFilter}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -70,7 +72,7 @@ object GenerateRandomData {
     val datasetsToGenerate = new collection.mutable.ArrayBuffer[Int]()
     datasetsToGenerate ++= 1 to numDatasets
     val datasetsBeingGenerated = new collection.mutable.ArrayBuffer[Future[Int]]()
-    val globalMBR = new EnvelopeNDLite(2, -10, -10, 10, 10)
+    val globalMBR = new EnvelopeNDLite(2, 0, 0, 10, 10)
     val concurrency = 32
 
     outPath.getFileSystem(sc.hadoopConfiguration).mkdirs(outPath)
@@ -95,6 +97,8 @@ object GenerateRandomData {
         val i = datasetsToGenerate.remove(datasetsToGenerate.size - 1)
         datasetsBeingGenerated.append(Future {
           val random = new Random(i)
+          val datasetName = f"dataset-${i}%03d"
+          val filesystem = outPath.getFileSystem(sc.hadoopConfiguration)
           val distribution: DistributionType = if (i <= 1000) UniformDistribution
           else if (i <= 1200) DiagonalDistribution
           else if (i <= 1400) GaussianDistribution
@@ -127,26 +131,31 @@ object GenerateRandomData {
             case _ => None
           }
           val dataset: SpatialRDD = generator.generate(cardinality)
-          val datasetName = f"dataset-${i}%03d"
           // 1- Write the dataset to the output as a single file
           val datasetFile = new Path(outPath, datasetName+".wkt.bz2")
-          dataset.writeSpatialFile(datasetFile.toString, "wkt",
-            Seq(SpatialWriter.CompatibilityMode -> true, CSVFeatureWriter.FieldSeparator -> ',',
-              SpatialWriter.OverwriteOutput -> true))
+          if (!filesystem.isFile(datasetFile)) {
+            dataset.writeSpatialFile(datasetFile.toString, "wkt",
+              Seq(SpatialWriter.CompatibilityMode -> true, CSVFeatureWriter.FieldSeparator -> '\t',
+                SpatialWriter.OverwriteOutput -> true))
+          }
 
           // 2- Generate summary
-          val summaryPath = new Path(outPath, datasetName+"_summary")
-          GriddedSummary.run(Seq("separator" -> ",", "iformat" -> "wkt", "numcells" -> "128,128"),
-            inputs = Array(datasetFile.toString),
-            outputs = Array(summaryPath.toString),
-            sc)
-          // Move the file out of the directory
-          val filesystem = summaryPath.getFileSystem(sc.hadoopConfiguration)
-          val summaryFile = filesystem.listStatus(summaryPath, new PathFilter {
-            override def accept(path: Path) = path.getName.startsWith("part")
-          })
-          filesystem.rename(summaryFile.head.getPath, new Path(summaryPath.toString+".csv"))
-          filesystem.delete(summaryPath, true)
+          val summaryPath = new Path(outPath, datasetName+"_summary.csv")
+          if (!filesystem.isFile(summaryPath)) {
+            val tempSummaryPath = new Path(outPath, datasetName + "_summary_temp")
+            GriddedSummary.run(Seq("separator" -> "\t", "iformat" -> "wkt", "numcells" -> "128,128"),
+              inputs = Array(datasetFile.toString),
+              outputs = Array(tempSummaryPath.toString),
+              sc)
+            sc.geojsonFile("MSBuildings.geojson.bz2")
+              .writeSpatialFile("MSBuildings.csv.bz2", "wkt", opts = "compatibility" -> true)
+            // Move the file out of the directory
+            val summaryFile = filesystem.listStatus(summaryPath, new PathFilter {
+              override def accept(path: Path) = path.getName.startsWith("part")
+            })
+            filesystem.rename(summaryFile.head.getPath, summaryPath)
+            filesystem.delete(tempSummaryPath, true)
+          }
           // 3- Draw an image of it
           SingleLevelPlot.plotFeatures(dataset, 1024, 1024,
             new Path(outPath, datasetName+".png").toString, canvasMBR = globalMBR)
