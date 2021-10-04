@@ -78,18 +78,16 @@ object GenerateRandomData {
     outPath.getFileSystem(sc.hadoopConfiguration).mkdirs(outPath)
 
     while (datasetsToGenerate.nonEmpty || datasetsBeingGenerated.nonEmpty) {
-      // Wait until some jobs are done
-      while (datasetsBeingGenerated.nonEmpty) {
-        var i = 0
-        while (i < datasetsBeingGenerated.size) {
-          val datasetGenerationProcess = datasetsBeingGenerated(i)
-          try {
-            // Wait at most one second
-            Await.ready(datasetGenerationProcess, Duration.fromNanos(1E9))
-            datasetsBeingGenerated.remove(i)
-          } catch {
-            case _: TimeoutException | _: InterruptedException => i += 1
-          }
+      // Check if any jobs are done
+      var i = 0
+      while (i < datasetsBeingGenerated.size) {
+        val datasetGenerationProcess = datasetsBeingGenerated(i)
+        try {
+          // Wait at most one second
+          Await.ready(datasetGenerationProcess, Duration.fromNanos(1E9))
+          datasetsBeingGenerated.remove(i)
+        } catch {
+          case _: TimeoutException | _: InterruptedException => i += 1
         }
       }
       // Launch new jobs
@@ -97,7 +95,7 @@ object GenerateRandomData {
         val i = datasetsToGenerate.remove(datasetsToGenerate.size - 1)
         datasetsBeingGenerated.append(Future {
           val random = new Random(i)
-          val datasetName = f"dataset-${i}%03d"
+          val datasetName = f"dataset-$i%04d"
           val filesystem = outPath.getFileSystem(sc.hadoopConfiguration)
           val distribution: DistributionType = if (i <= 1000) UniformDistribution
           else if (i <= 1200) DiagonalDistribution
