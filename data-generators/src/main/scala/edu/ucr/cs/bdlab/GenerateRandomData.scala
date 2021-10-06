@@ -16,12 +16,10 @@
 package edu.ucr.cs.bdlab
 
 import edu.ucr.cs.bdlab.beast.generator.SpatialGenerator
-import edu.ucr.cs.bdlab.beast.geolite.IFeature
 import edu.ucr.cs.bdlab.beast.operations.GriddedSummary
 import edu.ucr.cs.bdlab.davinci.SingleLevelPlot
 import org.apache.hadoop.fs.{Path, PathFilter}
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 
 import java.util.concurrent.TimeoutException
@@ -42,14 +40,14 @@ object GenerateRandomData {
     val spark: SparkSession = SparkSession.builder().config(conf).getOrCreate()
     val sc: SparkContext = spark.sparkContext
     import edu.ucr.cs.bdlab.beast._
-
-    import scala.util.Random
-    import edu.ucr.cs.bdlab.beast.io.{CSVFeatureWriter, SpatialWriter}
     import edu.ucr.cs.bdlab.beast.generator.{BitDistribution, DiagonalDistribution, DistributionType, GaussianDistribution, ParcelDistribution, SierpinskiDistribution, UniformDistribution}
     import edu.ucr.cs.bdlab.beast.geolite.EnvelopeNDLite
-    import scala.concurrent.{Await, Future}
-    import scala.concurrent.duration._
+    import edu.ucr.cs.bdlab.beast.io.{CSVFeatureWriter, SpatialWriter}
+
     import scala.concurrent.ExecutionContext.Implicits.global
+    import scala.concurrent.duration._
+    import scala.concurrent.{Await, Future}
+    import scala.util.Random
 
     def randomDouble(random: Random, range: Array[Double]) = {
       random.nextDouble() * (range(1) - range(0)) + range(0)
@@ -111,7 +109,7 @@ object GenerateRandomData {
           val y1 = randomDouble(random, Array(globalMBR.getMinCoord(1), globalMBR.getMaxCoord(1) - mbrHeight))
           val datasetMBR = new EnvelopeNDLite(2, x1, y1, x1 + mbrWidth, y1 + mbrHeight)
           val generator = sc.generateSpatialData.mbr(datasetMBR)
-            .config(UniformDistribution.MaxSize, s"${randomDouble(random, boxSizes)}")
+            .config(UniformDistribution.MaxSize, s"${randomDouble(random, boxSizes) / (mbrWidth max mbrHeight)}")
             .config(UniformDistribution.NumSegments, s"${random.nextInt(numSegments(1) - numSegments(0)) + numSegments(0)}")
             .config(UniformDistribution.GeometryType, "polygon")
             .config(SpatialGenerator.Seed, i)
@@ -141,14 +139,16 @@ object GenerateRandomData {
           val summaryPath = new Path(outPath, datasetName+"_summary.csv")
           if (!filesystem.isFile(summaryPath)) {
             val tempSummaryPath = new Path(outPath, datasetName + "_summary_temp")
-            GriddedSummary.run(Seq("separator" -> "\t", "iformat" -> "wkt", "numcells" -> "128,128"),
-              inputs = Array(datasetFile.toString),
-              outputs = Array(tempSummaryPath.toString),
-              sc)
-            sc.geojsonFile("MSBuildings.geojson.bz2")
-              .writeSpatialFile("MSBuildings.csv.bz2", "wkt", opts = "compatibility" -> true)
+            val (globalSummary, localSummaries) = GriddedSummary.computeForFeatures(dataset, 128, 128)
+            // Write the local summaries to the given input file
+            val localSummariesDF = GriddedSummary.createSummaryDataframe(globalSummary, localSummaries)
+            localSummariesDF.write
+              .option("delimiter", ",")
+              .option("header", true)
+              .mode(SaveMode.Overwrite)
+              .csv(tempSummaryPath.toString)
             // Move the file out of the directory
-            val summaryFile = filesystem.listStatus(summaryPath, new PathFilter {
+            val summaryFile = filesystem.listStatus(tempSummaryPath, new PathFilter {
               override def accept(path: Path) = path.getName.startsWith("part")
             })
             filesystem.rename(summaryFile.head.getPath, summaryPath)
