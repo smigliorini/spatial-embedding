@@ -108,6 +108,7 @@ object GenerateRandomData {
           val x1 = randomDouble(random, Array(globalMBR.getMinCoord(0), globalMBR.getMaxCoord(0) - mbrWidth))
           val y1 = randomDouble(random, Array(globalMBR.getMinCoord(1), globalMBR.getMaxCoord(1) - mbrHeight))
           val datasetMBR = new EnvelopeNDLite(2, x1, y1, x1 + mbrWidth, y1 + mbrHeight)
+          //println(s"${datasetName},${x1},${y1},${x1+mbrWidth},${y1+mbrHeight}")
           val generator = sc.generateSpatialData.mbr(datasetMBR)
             .config(UniformDistribution.MaxSize, s"${randomDouble(random, boxSizes) / (mbrWidth max mbrHeight)}")
             .config(UniformDistribution.NumSegments, s"${random.nextInt(numSegments(1) - numSegments(0)) + numSegments(0)}")
@@ -124,7 +125,7 @@ object GenerateRandomData {
             case DiagonalDistribution =>
               generator.config(DiagonalDistribution.Buffer, randomDouble(random, buffers))
                 .config(DiagonalDistribution.Percentage, randomDouble(random, percentages))
-            case _ => None
+            case _ => // Nothing need to be done but the case has to be added to avoid no match exception
           }
           val dataset: SpatialRDD = generator.generate(cardinality)
           // 1- Write the dataset to the output as a single file
@@ -149,7 +150,7 @@ object GenerateRandomData {
               .csv(tempSummaryPath.toString)
             // Move the file out of the directory
             val summaryFile = filesystem.listStatus(tempSummaryPath, new PathFilter {
-              override def accept(path: Path) = path.getName.startsWith("part")
+              override def accept(path: Path): Boolean = path.getName.startsWith("part")
             })
             filesystem.rename(summaryFile.head.getPath, summaryPath)
             filesystem.delete(tempSummaryPath, true)
