@@ -80,6 +80,7 @@ def gen_input_from_file(dimx,dimy,dimz,path):
 		print('Processing file {0} ...'.format(ff))
 		h0 = gen_hist_from_file(dimx,dimy,dimz,ff)
 		hh[count] = h0
+		# computing global histogram: TODO
 		count += 1
 	return hh	
 def cell_mod(dimz,card,delta,lenx,dx,leny,dy,area,dia,pnt,deltapnt,size,deltasize):
@@ -115,7 +116,7 @@ def generate(num,dimx,dimy,dimz,type):
 		if ((i % math.ceil(num/10)) == 0):
 			print("Done: ",i,"/",num)
 		card = rd.randint(10,1000)
-		delta = math.ceil(0.1*card)
+		delta = math.ceil(0.2*card)
 		lenx = rd.random()*0.2
 		dx = 0.1*lenx
 		leny = rd.random()*0.2
@@ -166,12 +167,14 @@ def generate(num,dimx,dimy,dimz,type):
 	for i in range(num):
 		j = rd.randint(0,math.ceil(dimx*2/3))
 		k = rd.randint(0,math.ceil(dimy*2/3))
-		d_j = rd.randint(math.ceil(dimx/6),math.ceil(dimx/3))
-		d_k = rd.randint(math.ceil(dimy/6),math.ceil(dimy/3))
+		d_j = rd.randint(math.ceil(dimx/6),math.ceil(dimx/2))
+		d_k = rd.randint(math.ceil(dimy/6),math.ceil(dimy/2))
+		card = rd.randint(100,8000)
+		delta = math.ceil(0.2*card)
 		for jbis in range(d_j):
 			for kbis in range(d_k):
 				if (j+jbis < dimx and k+kbis < dimy):
-					g[i,j+jbis,k+kbis] = rd.randint(0,8000)
+					g[i,j+jbis,k+kbis] = card + rd.randint(-delta,delta)
 
 	print("Generating random range query selectivities...")
 	b = np.zeros(num)
