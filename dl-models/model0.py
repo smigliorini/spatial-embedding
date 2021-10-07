@@ -80,16 +80,16 @@ def auto_encoder(type,loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
 		else:
 			print("Embedding dim: ", latent_dim*dimx/4*dimy/4)
 			print("Inizilizing Autoencoder CNN global...")
-			ae_glo = enc.AutoencoderCNN_global(latent_dim,dimx,dimy,1)
+			ae_glo = enc.AutoencoderCNN_global(latent_dim,dimx,dimy)
 		ae_glo.compile(optimizer='adam', loss=losses.MeanSquaredError())
 		#ae_glo.compile(optimizer='adam', loss='binary_crossentropy')
 		# splitting train and test 0.2
 		print("Splitting training and test set...")
 		# global histograms
-		X_train_global, X_test_global = train_test_split(g, test_size=0.2)
+		X_train_global, X_test_global = train_test_split(np.reshape(g,(g.shape[0],g.shape[1],g.shape[2],1)), test_size=0.2)
 		# training
 		print("Training Autoencoder global...")
-		ae_glo.fit(X_train_global, X_train_global, batch_size=32, epochs=12, shuffle=True, validation_data=(X_test_global, X_test_global))
+		ae_glo.fit(X_train_global, X_train_global, batch_size=16, epochs=20, shuffle=True, validation_data=(X_test_global, X_test_global))
 	else:
 		print("Skip global autoencoder")
 	if (loc == 1):
