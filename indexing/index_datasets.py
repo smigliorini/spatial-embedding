@@ -19,7 +19,7 @@ def index(path: str, output_path: str, sizes: List, dir: bool):
     # create output directory if not exists
     if not os.path.isdir(output_path):
         os.mkdir(output_path)
-    log = open(output_path + '/log_indexing', 'w')
+    log = open(output_path + SEPARATOR + 'log_indexing', 'w')
     # explore file tree
     if (dir):
         files = get_dir_path(path)
