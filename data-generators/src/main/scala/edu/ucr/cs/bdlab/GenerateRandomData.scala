@@ -75,6 +75,8 @@ object GenerateRandomData {
 
     outPath.getFileSystem(sc.hadoopConfiguration).mkdirs(outPath)
 
+    println("dataset,x1,y1,x2,y2,num_features,size,num_points,avg_area,avg_side_length_0,avg_side_length_1")
+
     while (datasetsToGenerate.nonEmpty || datasetsBeingGenerated.nonEmpty) {
       // Check if any jobs are done
       var i = 0
@@ -124,7 +126,7 @@ object GenerateRandomData {
             case DiagonalDistribution =>
               generator.config(DiagonalDistribution.Buffer, randomDouble(random, buffers))
                 .config(DiagonalDistribution.Percentage, randomDouble(random, percentages))
-            case _ => None
+            case _ => // Nothing need to be done but the case has to be added to avoid no match exception
           }
           val dataset: SpatialRDD = generator.generate(cardinality)
           // 1- Write the dataset to the output as a single file
@@ -137,6 +139,7 @@ object GenerateRandomData {
 
           // 2- Generate summary
           val summaryPath = new Path(outPath, datasetName+"_summary.csv")
+          val globalSummary =
           if (!filesystem.isFile(summaryPath)) {
             val tempSummaryPath = new Path(outPath, datasetName + "_summary_temp")
             val (globalSummary, localSummaries) = GriddedSummary.computeForFeatures(dataset, 128, 128)
@@ -149,14 +152,23 @@ object GenerateRandomData {
               .csv(tempSummaryPath.toString)
             // Move the file out of the directory
             val summaryFile = filesystem.listStatus(tempSummaryPath, new PathFilter {
-              override def accept(path: Path) = path.getName.startsWith("part")
+              override def accept(path: Path): Boolean = path.getName.startsWith("part")
             })
             filesystem.rename(summaryFile.head.getPath, summaryPath)
             filesystem.delete(tempSummaryPath, true)
+            globalSummary
+          } else {
+            dataset.summary
           }
+          println(s"${datasetName},${x1},${y1},${x1+mbrWidth},${y1+mbrHeight},${cardinality},${globalSummary.size}," +
+            s"${globalSummary.numPoints},${globalSummary.averageSideLength(0)},${globalSummary.averageSideLength(1)}," +
+            s"${globalSummary.averageArea}")
+
           // 3- Draw an image of it
-          SingleLevelPlot.plotFeatures(dataset, 1024, 1024,
-            new Path(outPath, datasetName+".png").toString, canvasMBR = globalMBR)
+          val imageFile = new Path(outPath, datasetName + ".png")
+          if (!filesystem.isFile(imageFile))
+            SingleLevelPlot.plotFeatures(dataset, 1024, 1024,
+              imageFile.toString, canvasMBR = globalMBR)
           i
         })
       }

@@ -1,4 +1,5 @@
 import argparse
+from genericpath import isdir
 import os
 import subprocess
 import time
@@ -6,16 +7,24 @@ from os import listdir, mkdir, path, sep
 from os.path import isfile, join
 from typing import List
 
+WINDOWS = '\\'
+LINUX = '/'
+
+SEPARATOR = WINDOWS
+
 
 beast_command = "beast index iformat:envelope separator:, gindex:grid pcriterion:'size(" # m)' "
 
-def index(path: str, output_path: str, sizes: List): 
+def index(path: str, output_path: str, sizes: List, dir: bool): 
     # create output directory if not exists
     if not os.path.isdir(output_path):
         os.mkdir(output_path)
-    log = open(output_path + '/log_indexing', 'w')
+    log = open(output_path + SEPARATOR + 'log_indexing', 'w')
     # explore file tree
-    files = get_files_path(path)
+    if (dir):
+        files = get_dir_path(path)
+    else:
+        files = get_files_path(path)
     log.write('Found {0} files'.format(len(files)))
     log.write('Selected size: [s: {0}, sm: {1}, m: {2}, ml: {3}, l: {4}]'.format(sizes[0], sizes[1], sizes[2], sizes[3], sizes[4]))
     print('Found {0} files'.format(len(files)))
@@ -25,9 +34,9 @@ def index(path: str, output_path: str, sizes: List):
     # for each file, launch Beast
     for structure in files:
         size, dir_path = get_correct_size(structure, sizes)
-        log.write("Indexing of: {0} with size: {1}".format(structure.split('/')[-2], size))
-        print("Indexing of: {0} with size: {1}".format(structure.split('/')[-2], size))
-        subprocess.check_output(beast_command + size + ")' " + structure + ' ' + output_path + '/' + dir_path +'_grid > /dev/null 2>&1', shell=True)
+        log.write("Indexing of: {0} with size: {1}".format(structure.split(SEPARATOR)[-1], size))
+        print("Indexing of: {0} with size: {1}".format(structure.split(SEPARATOR)[-1], size))
+        subprocess.check_output(beast_command + size + ")' " + structure + ' ' + output_path + SEPARATOR + dir_path +'_grid > /dev/null 2>&1', shell=True)
         count += 1
         log.write("{0}/{1}".format(count, len(files)))
         print("{0}/{1}".format(count, len(files)))
@@ -39,7 +48,7 @@ def index(path: str, output_path: str, sizes: List):
 # check size
 def get_correct_size(name: str, sizes: List):
     # check if size is declared in subdir or in the main dir
-    splitted = name.split('/')
+    splitted = name.split(SEPARATOR)
     for i in range(len(splitted)-1, 0, -1):
         result = check_size_abbreviation(splitted[i])
         if result < 0:
@@ -48,7 +57,7 @@ def get_correct_size(name: str, sizes: List):
             if result >= 0:
                 # controllo se sono nel caso large o small/medium
                 if abbreviation == 'l':
-                    return str(sizes[result]), splitted[i+1].lower()+'_' + abbreviation + '_' + splitted[-1].split('.')[0].split('-')[1]
+                    return str(sizes[result]), splitted[i+1].lower()+'_' + abbreviation
                 else:
                     return str(sizes[result]), splitted[i+1].lower().split('.')[0]+'_'+abbreviation
         else: 
@@ -97,6 +106,14 @@ def get_files_path(path: str):
             list_files_paths = list_files_paths + get_files_path(sub_path)
     return list_files_paths
 
+# composite explorer
+def get_dir_path(path: str):
+    list_dir_paths = []
+    for structure in listdir(path):
+        sub_path = join(path, structure)
+        if isdir(sub_path):
+            list_dir_paths.append(sub_path)
+    return list_dir_paths
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Automatic indexing of datasets with Beast')
@@ -107,10 +124,11 @@ if __name__ == '__main__':
     parser.add_argument('--size-medium', '-m', default='10m', help='size and unit of measure of the partitioning of medium datasets')
     parser.add_argument('--size-medium-large', '-ml', default='64m', help='size and unit of measure of the partitioning of medium large datasets')
     parser.add_argument('--size-large', '-l', default='128m', help='size and unit of measure of the partitioning of large datasets')
+    parser.add_argument('--index-dir', '-d', default=True, help='index dir, not single file')
     parser.add_argument('--output', '-o', default='./dataset_grid', help='output folder')
 
     args = parser.parse_args()
 
-    index(args.path, args.output, [args.size_small, args.size_small_medium, args.size_medium, args.size_medium_large, args.size_large]) 
+    index(args.path, args.output, [args.size_small, args.size_small_medium, args.size_medium, args.size_medium_large, args.size_large], args.index_dir) 
 
     # to do: aggiungere il mkdir per le cartelle dataset_grid e co
