@@ -74,15 +74,25 @@ def gen_input_from_file(dimx,dimy,dimz,path):
 	files = get_files_path(path)
 	print('Found {0} files'.format(len(files)))
 	hh = np.zeros((len(files),dimx,dimy,dimz))
+	hg = np.zeros((len(files),dimx,dimy))
 	count = 0
-	# for each file, generate one histogram
+	# for each file, generate one local histogram and one global histogram
 	for ff in files:
 		print('Processing file {0} ...'.format(ff))
 		h0 = gen_hist_from_file(dimx,dimy,dimz,ff)
 		hh[count] = h0
-		# computing global histogram: TODO
+		# computing global histogram
+		# TODO
 		count += 1
-	return hh	
+	return hh, hg
+def gen_rq_from_file(dimx,dimy,path):
+	files = get_files_path(path)
+	print('Found {0} files'.format(len(files)))
+	r = np.zeros((len(files),dimx,dimy))
+	b = np.zeros((len(files)))
+	count = 0
+	# TODO
+	return r, b
 def cell_mod(dimz,card,delta,lenx,dx,leny,dy,area,dia,pnt,deltapnt,size,deltasize):
 	if (dimz == 1):
 		cloc = 0.0
@@ -396,7 +406,7 @@ def shift_pos(a):
 				else:
 					shift_a[i,j,k] = a[i,j,k] + abs(min)
 	return shift_a
-def nor_a(a):
+def nor_a(a,log):
 	print("Normalizing a...")
 	if (a.ndim == 4):
 		min = np.ones(a.shape[3])*10000000000
@@ -433,9 +443,18 @@ def nor_a(a):
 			for k in range(a.shape[2]):
 				if (a.ndim == 4):
 					for l in range(a.shape[3]):
-						norm_a[i,j,k,l] = (a[i,j,k,l] - min[l])/(max[l]-min[l])
+						if (log == 1):
+							error = math.log(a[i,j,k,l]+1) - math.log(min[l]+1)
+							den = math.log(max[l]+1) - math.log(min[l]+1)
+						else:
+							error = a[i,j,k,l] - min[l]
+							den = max[l] - min[l]
+						norm_a[i,j,k,l] = error/den
 				else:
-					norm_a[i,j,k] = (a[i,j,k] - min)/(max - min)
+					if (log == 1):
+						norm_a[i,j,k] = (math.log(a[i,j,k]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
+					else:
+						norm_a[i,j,k] = (a[i,j,k] - min)/(max - min)
 	return norm_a
 def nor_g(g):
 	print("Normalizing g...")
