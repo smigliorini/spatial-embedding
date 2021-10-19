@@ -24,7 +24,7 @@ import edu.ucr.cs.bdlab.beast.{SpatialRDD, _}
 import edu.ucr.cs.bdlab.davinci.SingleLevelPlot
 import org.apache.commons.cli.{BasicParser, HelpFormatter, Options}
 import org.apache.hadoop.fs.{Path, PathFilter}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.locationtech.jts.geom.{Envelope, GeometryFactory}
 
@@ -56,6 +56,8 @@ object GenerateRandomData {
         "A path to a file to write the results of range queries to (relative to the output directory)"))
       .addOption(new org.apache.commons.cli.Option("h", "help", false,
         "Print this help information"))
+      .addOption(new org.apache.commons.cli.Option("p", "parallelism", true,
+        "Level of parallelism is how many concurrent datasets are processed together"))
   }
 
   def main(args: Array[String]): Unit = {
@@ -87,10 +89,20 @@ object GenerateRandomData {
       out
     }
     val queriesInput = commandline.getOptionValue("queries-input")
+    var existingResults: Array[Row] = Array()
     val queriesOutput: PrintStream = if (queriesInput == null) null else {
       val queriesOutputFile = new Path(outPath, commandline.getOptionValue("queries-output", "range-queries-result.csv"))
-      val out = new PrintStream(filesystem.create(queriesOutputFile))
+      val outFS = queriesOutputFile.getFileSystem(sc.hadoopConfiguration)
+      if (outFS.exists(queriesOutputFile)) {
+        // Read existing results, if any
+        existingResults = spark.read
+          .option("delimiter", ";").option("header", true).option("inferschema", true)
+          .csv(outPath.toString).collect()
+      }
+      val out = new PrintStream(outFS.create(queriesOutputFile))
       out.println("dataset;numQuery;queryArea;areaInt;cardinality;executionTime;mbrTests")
+      existingResults.foreach(row => out.println(row.mkString(";")))
+      out.flush()
       out
     }
     val rangeQueries: DataFrame = if (queriesInput == null) null else
@@ -105,7 +117,7 @@ object GenerateRandomData {
       val datasetsToGenerate = new collection.mutable.ArrayBuffer[Int]()
       datasetsToGenerate ++= 1 to numDatasets
       val datasetsBeingGenerated = new collection.mutable.ArrayBuffer[Future[Int]]()
-      val concurrency = 32
+      val parallelism = commandline.getOptionValue("parallelism", "32").toInt
 
       outPath.getFileSystem(sc.hadoopConfiguration).mkdirs(outPath)
 
@@ -123,7 +135,7 @@ object GenerateRandomData {
           }
         }
         // Launch new jobs
-        while (datasetsToGenerate.nonEmpty && datasetsBeingGenerated.size < concurrency) {
+        while (datasetsToGenerate.nonEmpty && datasetsBeingGenerated.size < parallelism) {
           val i = datasetsToGenerate.remove(datasetsToGenerate.size - 1)
           datasetsBeingGenerated.append(Future {
             val dataset = generateDataset(sc, i)
@@ -178,24 +190,29 @@ object GenerateRandomData {
               // Index the dataset
               val indexedDataset = dataset.spatialPartition(classOf[RSGrovePartitioner]).persist()
               // Select all the matching queries
-              val queries = rangeQueries.filter(s"datasetName='${datasetName}'").collect()
+              val queries: Array[Row] = rangeQueries.filter(s"datasetName='${datasetName}'").collect()
               val geometryFactory = new GeometryFactory()
               var iQuery: Int = 0
               queries.foreach(row => {
-                val x1 = row.getAs[Double]("minX")
-                val y1 = row.getAs[Double]("minY")
-                val x2 = row.getAs[Double]("maxX")
-                val y2 = row.getAs[Double]("maxY")
-                val numMBRTests = sc.longAccumulator
-                val query = geometryFactory.toGeometry(new Envelope(x1, x2, y1, y2))
-                val resultSize = indexedDataset.rangeQuery(query, numMBRTests).count()
-                queriesOutput.synchronized {
-                  queriesOutput.println(Array(datasetName, iQuery, query.getArea,
-                    query.getEnvelopeInternal.intersection(globalSummary.toJTSEnvelope).getArea,
-                    resultSize, "--", numMBRTests.value).mkString(";"))
+                // Run the query only if it does not already exist in the results
+                if (!existingResults.exists(r => r.getAs[Int]("numQuery") == iQuery && r.getAs[String]("dataset") == datasetName)) {
+                  val x1 = row.getAs[Double]("minX")
+                  val y1 = row.getAs[Double]("minY")
+                  val x2 = row.getAs[Double]("maxX")
+                  val y2 = row.getAs[Double]("maxY")
+                  val numMBRTests = sc.longAccumulator
+                  val query = geometryFactory.toGeometry(new Envelope(x1, x2, y1, y2))
+                  val resultSize = indexedDataset.rangeQuery(query, numMBRTests).count()
+                  queriesOutput.synchronized {
+                    queriesOutput.println(Array(datasetName, iQuery, query.getArea,
+                      query.getEnvelopeInternal.intersection(globalSummary.toJTSEnvelope).getArea,
+                      resultSize, "--", numMBRTests.value).mkString(";"))
+                    queriesOutput.flush()
+                  }
                 }
                 iQuery += 1
               })
+              indexedDataset.unpersist()
             }
             i
           })
