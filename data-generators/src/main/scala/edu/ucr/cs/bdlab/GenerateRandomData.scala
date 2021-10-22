@@ -187,32 +187,35 @@ object GenerateRandomData {
 
             // 4- Run range queries
             if (rangeQueries != null) {
-              // Index the dataset
-              val indexedDataset = dataset.spatialPartition(classOf[RSGrovePartitioner]).persist()
               // Select all the matching queries
               val queries: Array[Row] = rangeQueries.filter(s"datasetName='${datasetName}'").collect()
-              val geometryFactory = new GeometryFactory()
-              var iQuery: Int = 0
-              queries.foreach(row => {
-                // Run the query only if it does not already exist in the results
-                if (!existingResults.exists(r => r.getAs[Int]("numQuery") == iQuery && r.getAs[String]("dataset") == datasetName)) {
-                  val x1 = row.getAs[Double]("minX")
-                  val y1 = row.getAs[Double]("minY")
-                  val x2 = row.getAs[Double]("maxX")
-                  val y2 = row.getAs[Double]("maxY")
-                  val numMBRTests = sc.longAccumulator
-                  val query = geometryFactory.toGeometry(new Envelope(x1, x2, y1, y2))
-                  val resultSize = indexedDataset.rangeQuery(query, numMBRTests).count()
-                  queriesOutput.synchronized {
-                    queriesOutput.println(Array(datasetName, iQuery, query.getArea,
-                      query.getEnvelopeInternal.intersection(globalSummary.toJTSEnvelope).getArea,
-                      resultSize, "--", numMBRTests.value).mkString(";"))
-                    queriesOutput.flush()
+              if (queries.nonEmpty) {
+                // Index the dataset
+                val indexedDataset = dataset.spatialPartition(classOf[RSGrovePartitioner],
+                  opts = RSGrovePartitioner.ExpandToInfinity -> false).persist()
+                val geometryFactory = new GeometryFactory()
+                var iQuery: Int = 1
+                queries.foreach(row => {
+                  // Run the query only if it does not already exist in the results
+                  if (!existingResults.exists(r => r.getAs[Int]("numQuery") == iQuery && r.getAs[String]("dataset") == datasetName)) {
+                    val x1 = row.getAs[Double]("minX")
+                    val y1 = row.getAs[Double]("minY")
+                    val x2 = row.getAs[Double]("maxX")
+                    val y2 = row.getAs[Double]("maxY")
+                    val numMBRTests = sc.longAccumulator
+                    val query = geometryFactory.toGeometry(new Envelope(x1, x2, y1, y2))
+                    val resultSize = indexedDataset.rangeQuery(query, numMBRTests).count()
+                    queriesOutput.synchronized {
+                      queriesOutput.println(Array(datasetName, iQuery, query.getArea,
+                        query.getEnvelopeInternal.intersection(globalSummary.toJTSEnvelope).getArea,
+                        resultSize, "--", numMBRTests.value).mkString(";"))
+                      queriesOutput.flush()
+                    }
                   }
-                }
-                iQuery += 1
-              })
-              indexedDataset.unpersist()
+                  iQuery += 1
+                })
+                indexedDataset.unpersist()
+              }
             }
             i
           })
