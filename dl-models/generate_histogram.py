@@ -6,6 +6,21 @@ import numpy as np
 import random as rd
 import math
 import csv
+
+
+GLOBAL_X_MIN = 0
+GLOBAL_Y_MIN = 0
+GLOBAL_X_MAX = 10
+GLOBAL_Y_MAX = 10
+
+X_MIN = 0
+Y_MIN = 0
+X_MAX = 128
+Y_MAX = 128
+
+SIZE = 128
+
+
 def count_frequency(a,dimx,dimy):
 	freq = np.zeros(11)
 	for i in range(a.shape[0]):
@@ -82,9 +97,62 @@ def gen_input_from_file(dimx,dimy,dimz,path):
 		h0 = gen_hist_from_file(dimx,dimy,dimz,ff)
 		hh[count] = h0
 		# computing global histogram
-		# TODO
+		hg[count] = gen_global_hist(h0, dimx,dimy,dimz)
 		count += 1
 	return hh, hg
+
+
+def gen_global_hist(h0, dimx, dimy, dimz):
+
+	xsize = (X_MAX - X_MIN) / SIZE
+	ysize = (Y_MAX - Y_MIN) / SIZE
+
+	xsizeG = 10 / SIZE
+	ysizeG = 10 / SIZE
+
+	hg = np.zeros((dimx, dimy, dimz))
+
+	#card = num_features == 0
+
+	for i in range(0,SIZE):
+		for j in range(0, SIZE):
+			cell = h0[i, j]
+			xC = X_MIN + xsize * i
+			yC = Y_MIN + ysize * j
+
+			firstCellGcol = math.floor(xC / xsizeG)
+			firstCellGrow = math.floor(yC / ysizeG)
+
+			hg[firstCellGrow, firstCellGcol] = (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGrow, firstCellGcol), (firstCellGrow + xsizeG, firstCellGcol + ysizeG)) / cell[3])
+
+			secondCellGcol = math.floor((xC + xsize) / xsizeG)
+			if secondCellGcol > firstCellGcol:
+				hg[firstCellGrow, secondCellGcol] = (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGrow, secondCellGcol), (firstCellGrow + xsizeG, secondCellGcol + ysizeG)) / cell[3])
+			secondCellGrow = math.floor((yC + ysize) / ysizeG)
+
+			if secondCellGrow > firstCellGrow:
+				hg[secondCellGrow, firstCellGcol] = (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (secondCellGrow, firstCellGcol), (secondCellGrow + xsizeG, firstCellGcol + ysizeG)) / cell[3])
+
+			if secondCellGrow > firstCellGrow and secondCellGcol > firstCellGcol:
+				hg[secondCellGrow, secondCellGcol] = (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (secondCellGrow, secondCellGcol), (secondCellGrow + xsizeG, secondCellGcol + ysizeG)) / cell[3])
+	return hg
+
+
+def area_intersection(l1, r1, l2, r2):
+	x = 0
+	y = 1
+
+	x_dist = (min(r1[x], r2[x]) -
+			  max(l1[x], l2[x]))
+
+	y_dist = (min(r1[y], r2[y]) -
+			  max(l1[y], l2[y]))
+	area = 0
+	if x_dist > 0 and y_dist > 0:
+		area = x_dist * y_dist
+
+	return area
+
 def gen_rq_from_file(dimx,dimy,path):
 	files = get_files_path(path)
 	print('Found {0} files'.format(len(files)))
