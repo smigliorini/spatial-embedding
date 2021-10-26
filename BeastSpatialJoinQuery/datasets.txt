@@ -1,3 +1,2 @@
-test_datasets/non_partitioned/medium_datasets/diagonal_001.csv,test_datasets/partitioned/medium_datasets/diagonal_001/
-test_datasets/non_partitioned/medium_datasets/gaussian_001.csv,test_datasets/partitioned/medium_datasets/gaussian_001/
+test_datasets/non_partitioned/small_datasets/gaussian_001.csv,test_datasets/partitioned/small_datasets/gaussian_001/
 test_datasets/non_partitioned/small_datasets/diagonal_001.csv,test_datasets/partitioned/small_datasets/diagonal_001/
