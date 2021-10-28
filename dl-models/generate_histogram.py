@@ -57,6 +57,7 @@ def get_files_path(path: str):
 		else:
 			list_files_paths = list_files_paths + get_files_path(sub_path)
 	return list_files_paths
+
 # generate one histogram from one file of Ahmed
 def gen_hist_from_file(dimx,dimy,dimz,file):
 	h0 = np.zeros((dimx,dimy,dimz))
@@ -67,25 +68,48 @@ def gen_hist_from_file(dimx,dimy,dimz,file):
 			if line_count == 0:
 				print(f'Column names are: {", ".join(row)}')
 				line_count += 1
-			#DEBUG print(f'\t{row["i0"]},{row["i1"]}: {row["num_features"]}, {row["size"]}, {row["num_points"]}, {row["avg_area"]}, {row["avg_side_length_0"]}, {row["avg_side_length_1"]}.')
-			x = int(row["i0"])
-			y = int(row["i1"])
-			if (dimz >= 1):
-				h0[x,y,0] = int(row["num_features"])
-			if (dimz >= 2):
-				h0[x,y,1] = int(row["size"])
-			if (dimz >= 3):
-				h0[x,y,2] = int(row["num_points"])
-			if (dimz >= 4):
-				h0[x,y,3] = float(row["avg_area"])
-			if (dimz >= 5):
-				h0[x,y,4] = float(row["avg_side_length_0"])
-			if (dimz >= 6):	
-				h0[x,y,5] = float(row["avg_side_length_1"])
-			line_count += 1
+			else:
+				#DEBUG print(f'\t{row["i0"]},{row["i1"]}: {row["num_features"]}, {row["size"]}, {row["num_points"]}, {row["avg_area"]}, {row["avg_side_length_0"]}, {row["avg_side_length_1"]}.')
+				x = int(row["i0"])
+				y = int(row["i1"])
+				if (dimz >= 1):
+					h0[x,y,0] = int(row["num_features"])
+				if (dimz >= 2):
+					h0[x,y,1] = int(row["size"])
+				if (dimz >= 3):
+					h0[x,y,2] = int(row["num_points"])
+				if (dimz >= 4):
+					h0[x,y,3] = float(row["avg_area"])
+				if (dimz >= 5):
+					h0[x,y,4] = float(row["avg_side_length_0"])
+				if (dimz >= 6):	
+					h0[x,y,5] = float(row["avg_side_length_1"])
+				line_count += 1
 		print(f'Processed {line_count} lines.')
 	return h0
-def gen_input_from_file(dimx,dimy,dimz,path):
+
+#
+# loading local histograms and generating global histograms
+#
+def gen_input_from_file(dimx,dimy,dimz,path,mbrFile,suffix):
+#
+# path: directory where the files containing the histograms are located: for example histograms_small
+# mbrFile: the name of the file containing the MBR of the datasets the histograms refer to
+# suffix: the suffix that must to be added in order to obtain from the name of the file the name of the dataset: for example '_s'
+#
+	# Reading MBR file
+	mbr = {}
+	with open(mbrFile, mode='r') as csv_file:
+		csv_reader = csv.DictReader(csv_file,delimiter=',')
+		line_count = 0
+		for row in csv_reader:
+			if (line_count == 0):
+				print(f'Column names are: {", ".join(row)}')
+			print(f'\t{row["datasetName"]},{row["Collection"]}: {row["minX"]}, {row["minY"]}, {row["maxX"]}, {row["maxY"]}.')
+			name = row["datasetName"]
+			mbr[name] = dict([('minx', float(row["minX"])), ('miny', float(row["minY"])), ('maxx', float(row["maxX"])), ('maxy', float(row["maxY"]))])
+			line_count += 1
+
 	files = get_files_path(path)
 	print('Found {0} files'.format(len(files)))
 	hh = np.zeros((len(files),dimx,dimy,dimz))
@@ -94,47 +118,61 @@ def gen_input_from_file(dimx,dimy,dimz,path):
 	# for each file, generate one local histogram and one global histogram
 	for ff in files:
 		print('Processing file {0} ...'.format(ff))
-		h0 = gen_hist_from_file(dimx,dimy,dimz,ff)
+		h0 = gen_hist_from_file(dimx, dimy, dimz, ff)
 		hh[count] = h0
+		# searching MBR
+		name = (ff.rpartition("/")[2]).rpartition("_summary")[0]+suffix
+		print('Searching mbr for '+name)
+		mbr0 = mbr[name]
+		print('Find: ',mbr0)
 		# computing global histogram
-		hg[count] = gen_global_hist(h0, dimx,dimy,dimz)
+		hg[count] = gen_global_hist(h0, dimx, dimy, mbr0)
 		count += 1
 	return hh, hg
 
+def gen_global_hist(h0, dimx, dimy, mbr):
+# the dimensions of the grid (dimx,dimy) of the local and global histograms are the same
+#	xsize = (X_MAX - X_MIN) / SIZE
+	xsize = (mbr['maxx'] - mbr['minx']) / dimx
+#	ysize = (Y_MAX - Y_MIN) / SIZE
+	ysize = (mbr['maxy'] - mbr['miny']) / dimy
+	#print('Cell sides: ',xsize," x ",ysize)
 
-def gen_global_hist(h0, dimx, dimy, dimz):
+	cellArea = xsize*ysize
+	
+	xsizeG = (GLOBAL_X_MAX - GLOBAL_X_MIN) / dimx
+	ysizeG = (GLOBAL_Y_MAX - GLOBAL_Y_MIN) / dimy
+	#print('Global Cell sides: ',xsizeG," x ",ysizeG)
 
-	xsize = (X_MAX - X_MIN) / SIZE
-	ysize = (Y_MAX - Y_MIN) / SIZE
-
-	xsizeG = 10 / SIZE
-	ysizeG = 10 / SIZE
-
-	hg = np.zeros((dimx, dimy, dimz))
+	hg = np.zeros((dimx, dimy))
 
 	#card = num_features == 0
 
-	for i in range(0,SIZE):
-		for j in range(0, SIZE):
+	for i in range(dimx):
+		for j in range(dimy):
 			cell = h0[i, j]
-			xC = X_MIN + xsize * i
-			yC = Y_MIN + ysize * j
-
+			if (cell[0] == 0):
+				continue;
+			xC = mbr['minx'] + xsize * i
+			yC = mbr['miny'] + ysize * j
+			#print('Cell coord: (',xC,',',yC,',',xC+xsize,',',yC+ysize,')')
 			firstCellGcol = math.floor(xC / xsizeG)
 			firstCellGrow = math.floor(yC / ysizeG)
-
-			hg[firstCellGrow, firstCellGcol] = (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGrow, firstCellGcol), (firstCellGrow + xsizeG, firstCellGcol + ysizeG)) / cell[3])
+			#print('Global Cell coord: (',firstCellGrow,',',firstCellGcol,')')
+			#print('Cell intersection: ',area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGcol * xsizeG, firstCellGrow * ysizeG), (firstCellGcol * xsizeG + xsizeG, firstCellGrow * ysizeG + ysizeG)))
+			hg[firstCellGrow, firstCellGcol] += (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGcol * xsizeG, firstCellGrow * ysizeG), (firstCellGcol * xsizeG + xsizeG, firstCellGrow * ysizeG + ysizeG)) / cellArea)
+			#cell[3])
 
 			secondCellGcol = math.floor((xC + xsize) / xsizeG)
 			if secondCellGcol > firstCellGcol:
-				hg[firstCellGrow, secondCellGcol] = (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGrow, secondCellGcol), (firstCellGrow + xsizeG, secondCellGcol + ysizeG)) / cell[3])
+				hg[firstCellGrow, secondCellGcol] += (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (secondCellGcol * xsizeG, firstCellGrow * ysizeG), (secondCellGcol * xsizeG + xsizeG, firstCellGrow * ysizeG + ysizeG)) / cellArea)
+			
 			secondCellGrow = math.floor((yC + ysize) / ysizeG)
-
 			if secondCellGrow > firstCellGrow:
-				hg[secondCellGrow, firstCellGcol] = (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (secondCellGrow, firstCellGcol), (secondCellGrow + xsizeG, firstCellGcol + ysizeG)) / cell[3])
+				hg[secondCellGrow, firstCellGcol] += (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGcol * xsizeG, secondCellGrow * ysizeG), (firstCellGcol * xsizeG + xsizeG, secondCellGrow * ysizeG + ysizeG)) / cellArea)
 
 			if secondCellGrow > firstCellGrow and secondCellGcol > firstCellGcol:
-				hg[secondCellGrow, secondCellGcol] = (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (secondCellGrow, secondCellGcol), (secondCellGrow + xsizeG, secondCellGcol + ysizeG)) / cell[3])
+				hg[secondCellGrow, secondCellGcol] += (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (secondCellGcol * xsizeG, secondCellGrow * ysizeG), (secondCellGcol * xsizeG + xsizeG, secondCellGrow * ysizeG + ysizeG)) / cellArea)
 	return hg
 
 
@@ -147,8 +185,8 @@ def area_intersection(l1, r1, l2, r2):
 
 	y_dist = (min(r1[y], r2[y]) -
 			  max(l1[y], l2[y]))
-	area = 0
-	if x_dist > 0 and y_dist > 0:
+	area = 0.0
+	if (x_dist > 0.0 and y_dist > 0.0):
 		area = x_dist * y_dist
 
 	return area
@@ -274,20 +312,26 @@ def generate(num,dimx,dimy,dimz,type):
 	print("Returning a, g, b and r")
 	return a, g, b, r
 def prr(a):
-	for i in range(a.shape[0]):
+	for i in range(a.shape[0]-1,-1,-1):
 		for j in range(a.shape[1]):
 			v = int(a[i,j]*10) % 10
 			print(v, end='')
 		print("#")
+def prr_orig(a):
+	for i in range(a.shape[0]-1,-1,-1):
+		for j in range(a.shape[1]):
+			v = int(a[i,j]) % 10
+			print(v, end='')
+		print("#")
 def prr_delta10(a,da):
-	for i in range(a.shape[0]):
+	for i in range(a.shape[0]-1,-1,-1):
 		for j in range(a.shape[1]):
 			v = int(abs(a[i,j]-da[i,j])*10) % 10
 			print(v, end='')
 		print("#")	
 def prr_delta100(a,da):
 	avg = 0
-	for i in range(a.shape[0]):
+	for i in range(a.shape[0]-1,-1,-1):
 		avg = 0
 		for j in range(a.shape[1]):
 			v = int(abs(a[i,j]-da[i,j])*100) % 10
@@ -295,7 +339,7 @@ def prr_delta100(a,da):
 			print(v, end='')
 		print("#",int(avg)/a.shape[1])
 def prr1(a,s1,s2):
-	for i in range(a.shape[0]):
+	for i in range(a.shape[0]-1,-1,-1):
 		for j in range(a.shape[1]):
 			if (a[i,j] <= s1):
 				print("0", end='')
@@ -306,7 +350,7 @@ def prr1(a,s1,s2):
 					print("1", end='')
 		print("#")
 def prr_a(a,f,s1,s2):
-	for i in range(a.shape[0]):
+	for i in range(a.shape[0]-1,-1,-1):
 		for j in range(a.shape[1]):
 			if (a[i,j,f] <= s1):
 				print("0", end='')
@@ -474,6 +518,32 @@ def shift_pos(a):
 				else:
 					shift_a[i,j,k] = a[i,j,k] + abs(min)
 	return shift_a
+def nor_a_with_min_max(a,log,min,max):
+	print("Normalizing a with given min max...")
+	if (a.ndim == 4):
+		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2],a.shape[3]))
+	else:
+		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2]))
+	for i in range(a.shape[0]):
+		if ((i % math.ceil(a.shape[0]/10)) == 0):
+			print("Done: ",i,"/",a.shape[0])
+		for j in range(a.shape[1]):
+			for k in range(a.shape[2]):
+				if (a.ndim == 4):
+					for l in range(a.shape[3]):
+						if (log == 1):
+							error = math.log(a[i,j,k,l]+1) - math.log(min[l]+1)
+							den = math.log(max[l]+1) - math.log(min[l]+1)
+						else:
+							error = a[i,j,k,l] - min[l]
+							den = max[l] - min[l]
+						norm_a[i,j,k,l] = error/den
+				else:
+					if (log == 1):
+						norm_a[i,j,k] = (math.log(a[i,j,k]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
+					else:
+						norm_a[i,j,k] = (a[i,j,k] - min)/(max - min)
+	return norm_a
 def nor_a(a,log):
 	print("Normalizing a...")
 	if (a.ndim == 4):
@@ -524,7 +594,7 @@ def nor_a(a,log):
 					else:
 						norm_a[i,j,k] = (a[i,j,k] - min)/(max - min)
 	return norm_a
-def nor_g(g):
+def nor_g(g,log):
 	print("Normalizing g...")
 	norm_g = np.zeros((g.shape[0],g.shape[1],g.shape[2]))
 	min = 10000000000.0
@@ -542,7 +612,10 @@ def nor_g(g):
                         print("Done: ",i,"/",g.shape[0])
 		for j in range(g.shape[1]):
 			for k in range(g.shape[2]):
-				norm_g[i,j,k] = (g[i,j,k] - min)/(max - min)
+				if (log == 1):
+					norm_g[i,j,k] = (math.log(g[i,j,k]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
+				else:
+					norm_g[i,j,k] = (g[i,j,k] - min)/(max - min)
 	return norm_g
 def nor_b(b):
 	print("Normalizing b...")
