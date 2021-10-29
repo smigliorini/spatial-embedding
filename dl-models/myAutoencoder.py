@@ -13,14 +13,26 @@ class AutoencoderCNN_local(Model):
   def __init__(self, latent_dim, dimx, dimy, dimz):
     super(AutoencoderCNN_local, self).__init__()
     self.latent_dim = latent_dim
+    self.dimx = dimx  
+    self.dimy = dimy
     self.encoder = tf.keras.Sequential([
       layers.Input(shape=(dimx, dimy, dimz)),
+      layers.Conv2D(latent_dim*4, (3, 3), activation='relu', padding='same', strides=2),
+      # prima era: latent_dim*2
       layers.Conv2D(latent_dim*2, (3, 3), activation='relu', padding='same', strides=2),
-      layers.Conv2D(latent_dim, (3, 3), activation='relu', padding='same', strides=2),
+      # prima era: latent_dim
+      # i due layer seguenti sono da eliminare
+      layers.Flatten(),
+      layers.Dense(int(dimx/4*dimy/4*latent_dim), activation='relu'),
     ])
     self.decoder = tf.keras.Sequential([
-      layers.Conv2DTranspose(latent_dim, kernel_size=3, strides=2, activation='relu', padding='same'),
+      # eliminare i due layer seguenti
+      layers.Dense(int(dimx/4*dimy/4*latent_dim), activation='relu'),
+      layers.Reshape((int(dimx/4), int(dimy/4), latent_dim)),
+      # prima era latent_dim
       layers.Conv2DTranspose(latent_dim*2, kernel_size=3, strides=2, activation='relu', padding='same'),
+      # prima era latent_dim*2
+      layers.Conv2DTranspose(latent_dim*4, kernel_size=3, strides=2, activation='relu', padding='same'),
       layers.Conv2D(dimz, kernel_size=(3, 3), activation='sigmoid', padding='same'),
     ])
   def call(self, x):
@@ -34,6 +46,8 @@ class Autoencoder_local(Model):
   def __init__(self, latent_dim, dimx, dimy, dimz):
     super(Autoencoder_local, self).__init__()
     self.latent_dim = latent_dim
+    self.dimx = dimx  
+    self.dimy = dimy
     self.encoder = tf.keras.Sequential([
       layers.Flatten(),
       layers.Dense(latent_dim, activation='relu'),
@@ -62,6 +76,8 @@ class Autoencoder_global(Model):
   def __init__(self, latent_dim, dimx, dimy):
     super(Autoencoder_global, self).__init__()
     self.latent_dim = latent_dim
+    self.dimx = dimx  
+    self.dimy = dimy
     self.encoder = tf.keras.Sequential([
       layers.Flatten(),
       layers.Dense(latent_dim, activation='relu'),
@@ -82,14 +98,20 @@ class AutoencoderCNN_global(Model):
   def __init__(self, latent_dim, dimx, dimy):
     super(AutoencoderCNN_global, self).__init__()
     self.latent_dim = latent_dim
+    self.dimx = dimx
+    self.dimy = dimy
     self.encoder = tf.keras.Sequential([
       layers.Input(shape=(dimx, dimy, 1)),
+      layers.Conv2D(latent_dim*4, (3, 3), activation='relu', padding='same', strides=2),
       layers.Conv2D(latent_dim*2, (3, 3), activation='relu', padding='same', strides=2),
-      layers.Conv2D(latent_dim, (3, 3), activation='relu', padding='same', strides=2),
+      layers.Flatten(),
+      layers.Dense(int(dimx/4*dimy/4*latent_dim), activation='relu'),
     ])
     self.decoder = tf.keras.Sequential([
-      layers.Conv2DTranspose(latent_dim, kernel_size=3, strides=2, activation='relu', padding='same'),
+      layers.Dense(int(dimx/4*dimy/4*latent_dim), activation='relu'),
+      layers.Reshape((int(dimx/4), int(dimy/4), latent_dim)),
       layers.Conv2DTranspose(latent_dim*2, kernel_size=3, strides=2, activation='relu', padding='same'),
+      layers.Conv2DTranspose(latent_dim*4, kernel_size=3, strides=2, activation='relu', padding='same'),
       layers.Conv2D(1, kernel_size=(3, 3), activation='sigmoid', padding='same'),
     ])
   def call(self, x):
