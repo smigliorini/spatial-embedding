@@ -251,3 +251,159 @@ def plot_h6_mix_neg(orig,dec,start,n):
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
   plt.show()
+def plot_h6_mix_neg_emb(orig,dec,emb,start,n):
+  plt.figure(figsize=(20, 8))
+  for i in range(n):
+    #
+    # display original feature 0,2,4
+    #
+    ax = plt.subplot(5, n, i + 1)
+    norm = np.zeros((orig.shape[1],orig.shape[2],3))
+    for j in range(orig.shape[1]):
+      for k in range(orig.shape[2]):
+        norm[j,k,0] = (1-orig[start+i,j,k,0])
+        norm[j,k,1] = (1-orig[start+i,j,k,2])
+        norm[j,k,2] = (1-orig[start+i,j,k,4])
+    plt.imshow(norm)
+    plt.title("orig(0,2,4) ["+str(start+i)+"]")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display reconstruction feature 0,2,4
+    #
+    ax = plt.subplot(5, n, i + 1 + n)
+    denorm = np.zeros((orig.shape[1],orig.shape[2],3))
+    for j in range(orig.shape[1]):
+      for k in range(orig.shape[2]):
+        denorm[j,k,0] = (1-dec[start+i,j,k,0])
+        denorm[j,k,1] = (1-dec[start+i,j,k,2])
+        denorm[j,k,2] = (1-dec[start+i,j,k,4])
+    plt.imshow(denorm)
+    plt.title("reconstructed")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display embedding
+    #
+    ax = plt.subplot(5, n, i + 1 + 2*n)
+    embnorm = np.zeros((emb.shape[1],emb.shape[2],3))
+    for j in range(emb.shape[1]):
+      for k in range(emb.shape[2]):
+        embnorm[j,k,0] = (1-emb[start+i,j,k,0])
+        if (embnorm[j,k,0] < 0):
+          embnorm[j,k,0] = 0
+        if (embnorm[j,k,0] > 1):
+          embnorm[j,k,0] = 1
+        if (emb.shape[3] > 1):
+          embnorm[j,k,1] = (1-emb[start+i,j,k,1])
+          if (embnorm[j,k,1] < 0):
+            embnorm[j,k,1] = 0
+          if (embnorm[j,k,1] > 1):
+            embnorm[j,k,1] = 1
+        else:
+          embnorm[j,k,1] = 0
+        if (emb.shape[3] > 2):
+          embnorm[j,k,2] = (1-emb[start+i,j,k,2])
+          if (embnorm[j,k,2] < 0):
+            embnorm[j,k,2] = 0
+          if (embnorm[j,k,2] > 1):
+            embnorm[j,k,2] = 1
+        else:
+          embnorm[j,k,2] = 0
+    plt.imshow(embnorm)
+    plt.title("embedding")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display original feature 1,3,5
+    #
+    ax = plt.subplot(5, n, i + 1 + 3*n)
+    norm1 = np.zeros((orig.shape[1],orig.shape[2],3))
+    for j in range(orig.shape[1]):
+      for k in range(orig.shape[2]):
+        norm1[j,k,0] = (1-orig[start+i,j,k,1])
+        norm1[j,k,1] = (1-orig[start+i,j,k,3])
+        norm1[j,k,2] = (1-orig[start+i,j,k,5])
+    plt.imshow(norm1)
+    plt.title("orig(1,3,5) ["+str(start+i)+"]")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display reconstruction feature 1,3,5
+    #
+    ax = plt.subplot(5, n, i + 1 + 4*n)
+    denorm1 = np.zeros((orig.shape[1],orig.shape[2],3))
+    for j in range(orig.shape[1]):
+      for k in range(orig.shape[2]):
+        denorm1[j,k,0] = (1-dec[start+i,j,k,1])
+        denorm1[j,k,1] = (1-dec[start+i,j,k,3])
+        denorm1[j,k,2] = (1-dec[start+i,j,k,5])
+    plt.imshow(denorm1)
+    plt.title("reconstructed")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+  plt.show()
+
+def plot_h6_mix_neg_emb_g(orig,dec,emb,start,n):
+  plt.figure(figsize=(20, 8))
+  for i in range(n):
+    #
+    # display original feature 0
+    #
+    ax = plt.subplot(5, n, i + 1)
+    norm = np.zeros((orig.shape[1],orig.shape[2],3))
+    for j in range(orig.shape[1]):
+      for k in range(orig.shape[2]):
+        norm[j,k,0] = (1-orig[start+i,j,k,0])
+        norm[j,k,1] = 1
+        norm[j,k,2] = 1
+    plt.imshow(norm)
+    plt.title("orig ["+str(start+i)+"]")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display reconstruction feature 0
+    #
+    ax = plt.subplot(5, n, i + 1 + n)
+    denorm = np.zeros((orig.shape[1],orig.shape[2],3))
+    for j in range(orig.shape[1]):
+      for k in range(orig.shape[2]):
+        denorm[j,k,0] = (1-dec[start+i,j,k,0])
+        denorm[j,k,1] = 1
+        denorm[j,k,2] = 1
+    plt.imshow(denorm)
+    plt.title("reconstructed")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display embedding
+    #
+    ax = plt.subplot(5, n, i + 1 + 2*n)
+    embnorm = np.zeros((emb.shape[1],emb.shape[2],3))
+    for j in range(emb.shape[1]):
+      for k in range(emb.shape[2]):
+        embnorm[j,k,0] = (1-emb[start+i,j,k,0])
+        if (embnorm[j,k,0] < 0):
+          embnorm[j,k,0] = 0
+        if (embnorm[j,k,0] > 1):
+          embnorm[j,k,0] = 1
+        embnorm[j,k,1] = (1-emb[start+i,j,k,1])
+        if (embnorm[j,k,1] < 0):
+          embnorm[j,k,1] = 0
+        if (embnorm[j,k,1] > 1):
+          embnorm[j,k,1] = 1
+        embnorm[j,k,2] = 1
+    plt.imshow(embnorm)
+    plt.title("embedding")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+  plt.show()
+
