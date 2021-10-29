@@ -45,7 +45,10 @@ def create_h(n,dimx,dimy,dimz,norm_type,distr):
 # model definition
 
 # Autoencoder
-def auto_encoder(type,loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
+def auto_encoder(type,loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g):
+	# type: 0=DENSE, 1=CNN
+	# loc: 1=generate local autoencored, 0=local autoencoder is not generated
+	# glo: 1=generate global autoencored, 0=global autoencoder is not generated
 	# latent_dim is equal to the size of the embedding representation of the histogram for DENSE network
 	# while for CNN it is equal to the number of values in each cell of the embedding, thus the size of
 	# the embedding is obtained by the formula: dimx/4 * dimy/4 * latent_dim
@@ -65,10 +68,10 @@ def auto_encoder(type,loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
 		# splitting train and test 0.2
 		print("Splitting training and test set...")
 		# local histograms
-		X_train_hist, X_test_hist, X_train_range, X_test_range, y_train_card, y_test_card = train_test_split(a, r, b, test_size=0.2)
+		X_train_hist, X_test_hist = train_test_split(a, test_size=0.2)
 		# training
 		print("Training Autoencoder local...")
-		ae_loc.fit(X_train_hist, X_train_hist, batch_size=16, epochs=20, shuffle=True, validation_data=(X_test_hist, X_test_hist))
+		ae_loc.fit(X_train_hist, X_train_hist, batch_size=16, epochs=30, shuffle=True, validation_data=(X_test_hist, X_test_hist))
 	else:
 		print("Skip local autoencoder")
 	if (glo == 1):
@@ -89,7 +92,7 @@ def auto_encoder(type,loc,glo,dimx,dimy,dimz,ldim_loc,ldim_glo,a,g,b,r):
 		X_train_global, X_test_global = train_test_split(np.reshape(g,(g.shape[0],g.shape[1],g.shape[2],1)), test_size=0.2)
 		# training
 		print("Training Autoencoder global...")
-		ae_glo.fit(X_train_global, X_train_global, batch_size=16, epochs=20, shuffle=True, validation_data=(X_test_global, X_test_global))
+		ae_glo.fit(X_train_global, X_train_global, batch_size=16, epochs=30, shuffle=True, validation_data=(X_test_global, X_test_global))
 	else:
 		print("Skip global autoencoder")
 	if (loc == 1):
