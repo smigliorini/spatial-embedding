@@ -518,8 +518,8 @@ def shift_pos(a):
 				else:
 					shift_a[i,j,k] = a[i,j,k] + abs(min)
 	return shift_a
-def nor_a_with_min_max(a,log,min,max):
-	print("Normalizing a with given min max...")
+def nor_with_min_max(a,log,min,max):
+	print("Normalizing with given min max...")
 	if (a.ndim == 4):
 		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2],a.shape[3]))
 	else:
@@ -607,6 +607,8 @@ def nor_g(g,log):
 					max = g[i,j,k]
 				if (g[i,j,k]<min):
 					min = g[i,j,k]
+	print(min)
+	print(max)
 	for i in range(g.shape[0]):
 		if ((i % math.ceil(g.shape[0]/10)) == 0):
                         print("Done: ",i,"/",g.shape[0])
