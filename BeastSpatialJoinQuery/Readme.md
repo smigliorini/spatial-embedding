@@ -1,11 +1,20 @@
 # SpatialJoin
 Execute the spatial join between every couple of datasets using 4 different join algorithms.
 ## Usage
-The program will expect to find inside the file `datasets.txt` a list of the datasets to be used both in their partitioned 
+The program accept three parameters:
+* `-i,--input <arg>`<br/>Specify the file containing the list of datasets to use for the spatial join. 
+If not specified the program will expect to find the datasets list inside the file `datasets.txt`
+* `-o,--output <arg>` <br/>Specify the directory that will contain the files with the statistical information regarding the
+spatial join executions. If not specified the program will use the current directory.
+* `-s,--safe` Save the partial results to avoid loosing them due to
+errors at run time
+
+## Input file
+The program will expect to find inside a TXT file a list of the datasets to be used both in their partitioned 
 and non-partitioned version. An example of the file is reported below.
 ```
 non_partitioned/medium_datasets/diagonal_001.csv,partitioned/medium_datasets/diagonal_001/
-non_partitioned/medium_datasets/gaussian_001.csv,artitioned/medium_datasets/gaussian_001/
+non_partitioned/medium_datasets/gaussian_001.csv,partitioned/medium_datasets/gaussian_001/
 non_partitioned/small_datasets/diagonal_001.csv,partitioned/small_datasets/diagonal_001/
 ```
 ## Results
@@ -114,8 +123,8 @@ SJMaster ..> AlgorithmResult : create
 ```
 -->
 
-* **ClassDiagram** is the main class. It's job is to prepare the environment and create the SJMaster.
+* **SpatialJoin** is the main class. Its job is to prepare the environment and create the SJMaster.
 * **SJMaster** is the core of the software. It loads the datasets and execute the joins.
 * **Results, SJResult** and **AlgorithmResult** are object used to store the information about the execution
-of the spatial joins and they contain respectively the global information, the info about the four type of algorithms on 
+of the spatial joins, and they contain respectively the global information, the info about the four type of algorithms on 
 a single couple of datasets and the information about a single join execution on a single couple of datasets.

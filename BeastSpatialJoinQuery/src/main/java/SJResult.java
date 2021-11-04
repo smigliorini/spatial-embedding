@@ -10,7 +10,7 @@ public class SJResult {
     public int dataset1GridNPartitions;
     public int dataset2GridNPartitions;
     public long resultSJSize;
-    public HashMap<JoinAlgorithms,AlgorithmResult> SJResultMap;
+    public final HashMap<JoinAlgorithms,AlgorithmResult> SJResultMap;
 
     public SJResult() {
         SJResultMap = new HashMap<>();

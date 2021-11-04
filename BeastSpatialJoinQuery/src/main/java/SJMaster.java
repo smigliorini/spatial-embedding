@@ -11,9 +11,7 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.FileReader;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,9 +22,9 @@ import java.util.regex.Pattern;
 public class SJMaster {
     private final ArrayList<String> datasets;
     private final ArrayList<String> datasets_grid;
-    private Results results ;
+    private final Results results ;
     private final SparkSession sparkSession;
-    private JavaSparkContext sparkContext;
+    private final JavaSparkContext sparkContext;
     private final ByteArrayOutputStream baos;
 
     /**
@@ -35,20 +33,17 @@ public class SJMaster {
      * @param baos {@link ByteArrayOutputStream} where the StdOut is redirect and that can be used to found the
      *                                          information about the spark execution.
      */
-    public SJMaster(String pathfile, ByteArrayOutputStream baos) {
+    public SJMaster(String pathfile, ByteArrayOutputStream baos) throws IOException {
         datasets = new ArrayList<>();
         datasets_grid = new ArrayList<>();
         this.baos = baos;
-        try {
-            BufferedReader br = new BufferedReader(new FileReader(pathfile));
-            String line = br.readLine();
-            while (line != null) {
-                datasets.add(line.split(",")[0]);
-                datasets_grid.add(line.split(",")[1].replace("\n",""));
-                line = br.readLine();
-            }
-        }catch (Exception e){
-            e.printStackTrace();
+
+        BufferedReader br = new BufferedReader(new FileReader(pathfile));
+        String line = br.readLine();
+        while (line != null) {
+            datasets.add(line.split(",")[0]);
+            datasets_grid.add(line.split(",")[1].replace("\n", ""));
+            line = br.readLine();
         }
 
         SparkConf conf = new SparkConf().setAppName("Beast Example");
@@ -95,6 +90,28 @@ public class SJMaster {
         }
     }
 
+    /**
+     * Execute the spatial join between every couple of datasets and store the results.
+     * It will periodically save the results to avoid losing data especially on long executions.
+     * The results can be retrieved using the method {@link #getResults()}
+     */
+    public void safeRun(String path){
+        BeastOptions beastOptions = new BeastOptions().set("separator", ',');
+        String format = "envelope(0,1,2,3)";
+        for (int i = 0; i < datasets.size() - 1 ; i++){
+            JavaRDD<IFeature> envelope1 = SpatialReader.readInput(sparkContext, beastOptions, datasets.get(i), format);
+            JavaRDD<IFeature> envelope1_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid.get(i), format);
+            for (int j = i+1; j < datasets.size(); j++){
+                JavaRDD<IFeature> envelope2 = SpatialReader.readInput(sparkContext, beastOptions, datasets.get(j), format);
+                JavaRDD<IFeature> envelope2_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid.get(j), format);
+                results.addEntry(datasets.get(i) + "," + datasets.get(j),
+                        executeSJ(envelope1,envelope2,envelope1_par,envelope2_par));
+                results.toCsv(path);
+                results.toJson(path);
+            }
+        }
+    }
+
 
     /**
      * Terminate the Spark session
@@ -112,6 +129,8 @@ public class SJMaster {
      * @return A structure containing all the statistical information about the execution of the 4 spatial join.
      */
     private SJResult executeSJ(JavaRDD<IFeature> envelope1, JavaRDD<IFeature> envelope2, JavaRDD<IFeature> envelope1_par,JavaRDD<IFeature> envelope2_par) {
+
+        Tuple2<IFeature, IFeature> unused;
         SJResult singleResults = new SJResult();
         SpatialJoinAlgorithms.ESJPredicate intersects = SpatialJoinAlgorithms.ESJPredicate.Intersects;
         try {
@@ -131,14 +150,14 @@ public class SJMaster {
 
             sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), intersects,
                     SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM, mbr, new BeastOptions());
-            System.err.println(sjResults.first());
+            unused = sjResults.first();
             singleResults.addJoinResult(JoinAlgorithms.PBSM, extractSingleSJ(baos.toString(), mbr.count()));
             baos.reset();
             mbr.reset();
 
             sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2_par.rdd(), intersects,
                     SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ, mbr, new BeastOptions());
-            System.err.println(sjResults.first());
+            unused = sjResults.first();
             singleResults.addJoinResult(JoinAlgorithms.DJ, extractSingleSJ(baos.toString(), mbr.count()));
             mbr.reset();
 
@@ -151,7 +170,7 @@ public class SJMaster {
                 sjResults = SpatialJoin.spatialJoin(envelope2_par.rdd(), envelope1.rdd(), intersects,
                         SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
             }
-            System.err.println(sjResults.first());
+            unused = sjResults.first();
             singleResults.addJoinResult(JoinAlgorithms.REPJ, extractSingleSJ(baos.toString(), mbr.count()));
             baos.reset();
             mbr.reset();
