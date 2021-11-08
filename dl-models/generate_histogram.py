@@ -66,7 +66,7 @@ def gen_hist_from_file(dimx,dimy,dimz,file):
 		line_count = 0
 		for row in csv_reader:
 			if line_count == 0:
-				print(f'Column names are: {", ".join(row)}')
+				#print(f'Column names are: {", ".join(row)}')
 				line_count += 1
 			else:
 				#DEBUG print(f'\t{row["i0"]},{row["i1"]}: {row["num_features"]}, {row["size"]}, {row["num_points"]}, {row["avg_area"]}, {row["avg_side_length_0"]}, {row["avg_side_length_1"]}.')
@@ -522,11 +522,19 @@ def nor_with_min_max(a,log,min,max):
 	print("Normalizing with given min max...")
 	if (a.ndim == 4):
 		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2],a.shape[3]))
+	elif (a.ndim == 1):
+		norm_a = np.zeros((a.shape[0]))
 	else:
 		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2]))
 	for i in range(a.shape[0]):
 		if ((i % math.ceil(a.shape[0]/10)) == 0):
 			print("Done: ",i,"/",a.shape[0])
+		if (a.ndim == 1):
+			if (log == 1):
+				norm_a[i] = (math.log(a[i]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
+			else:
+				norm_a[i] = (a[i] - min)/(max - min)
+			continue
 		for j in range(a.shape[1]):
 			for k in range(a.shape[2]):
 				if (a.ndim == 4):
