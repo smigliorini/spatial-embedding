@@ -1,25 +1,51 @@
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 
 public class Results {
-    private HashMap<String,SJResult> resultsMap;
-
+    private final HashMap<String,SJResult> resultsMap;
+    private final LocalDateTime launchTime ;
     public Results() {
         resultsMap = new HashMap<>();
+        launchTime = LocalDateTime.now();
     }
 
     public void addEntry(String files, SJResult sjResult){
         resultsMap.put(files,sjResult);
     }
 
-    public void toCsv() {
-        FileWriter file;
+    public void toJson(String path){
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        FileWriter myWriter = null;
         try {
-            file = new FileWriter("results.csv");
+            myWriter = new FileWriter(path +"/"+launchTime.toString()+".json");
+            myWriter.write(gson.toJson(this));
+            myWriter.close();
+        } catch (IOException e) {
+            System.err.println("An error occurred.");
+            e.printStackTrace();
+        }finally {
+            try {
+                assert myWriter != null;
+                myWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
-            BufferedWriter buffer = new BufferedWriter(file);
+    public void toCsv(String path) {
+        FileWriter file = null;
+        BufferedWriter buffer = null;
+        try {
+            file = new FileWriter(path +"/"+launchTime.toString()+"results.csv");
+
+            buffer = new BufferedWriter(file);
 
             String header ="dataset1,dataset2, dataset1Cardinality, dataset2Cardinality, dataset1GridNPartitions, dataset2GridNPartitions," +
                     "resultSJSize, " +
@@ -49,9 +75,16 @@ public class Results {
                 }
                 buffer.newLine();
             }
-            buffer.flush();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                assert buffer != null;
+                buffer.close();
+                file.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
