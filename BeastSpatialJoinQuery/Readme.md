@@ -1,13 +1,17 @@
 # SpatialJoin
 Execute the spatial join between every couple of datasets using 4 different join algorithms.
 ## Usage
-The program accept three parameters:
+The program accepts 2 parameters and 5 flags:
 * `-i,--input <arg>`<br/>Specify the file containing the list of datasets to use for the spatial join. 
 If not specified the program will expect to find the datasets list inside the file `datasets.txt`
 * `-o,--output <arg>` <br/>Specify the directory that will contain the files with the statistical information regarding the
 spatial join executions. If not specified the program will use the current directory.
 * `-s,--safe` Save the partial results to avoid loosing them due to
 errors at run time
+* `-d,--dj` Execute the spatial joins using the DJ algorithms
+* `-p,--pbsm` Execute the spatial joins using the PBSM algorithm
+* `-d,--dj` Execute the spatial joins using the DJ algorithm
+* `-r,--repj `Execute the spatial joins using the REPJ algorithm
 
 ## Input file
 The program will expect to find inside a TXT file a list of the datasets to be used both in their partitioned 
@@ -106,6 +110,10 @@ The four algorithms used are:
 * **PBMS** It's used with the non-partitioned version of the two datasets.
 * **DJ** It's used with the partitioned version of the two datasets.
 * **REPJ** It's used with the largest dataset partitioned and with the smaller one not-partitioned.
+
+To fasten up the process it is possible to specify which algorithm will be used for the spatial join using the four flags `-b,-p,-d,-r`.
+If no flags is provided, the execution will use all 4 of them.
+
 
 ## ClassDiagram
 [![](https://mermaid.ink/img/eyJjb2RlIjoiY2xhc3NEaWFncmFtXG5TSk1hc3RlciA8Li4gU3BhdGlhbEpvaW4gOiBjcmVhdGVcblJlc3VsdHMgPC4uIFNwYXRpYWxKb2luXG5SZXN1bHRzIFwiMVwiIC0tKiBcIjFcIiBTSk1hc3RlciBcblNKUmVzdWx0IFwiKlwiIC0tKiBcIjFcIiBSZXN1bHRzIFxuU0pSZXN1bHQgPC4uIFNKTWFzdGVyIDogY3JlYXRlXG5BbGdvcml0aG1SZXN1bHQgXCIqXCIgLS0qIFwiMVwiIFNKUmVzdWx0XG5BbGdvcml0aG1SZXN1bHQgPC4uIFJlc3VsdHNcblNKTWFzdGVyIC4uPiBBbGdvcml0aG1SZXN1bHQgOiBjcmVhdGUiLCJtZXJtYWlkIjp7InRoZW1lIjoiZGVmYXVsdCJ9LCJ1cGRhdGVFZGl0b3IiOmZhbHNlLCJhdXRvU3luYyI6dHJ1ZSwidXBkYXRlRGlhZ3JhbSI6ZmFsc2V9)](https://mermaid.live/edit#eyJjb2RlIjoiY2xhc3NEaWFncmFtXG5TSk1hc3RlciA8Li4gU3BhdGlhbEpvaW4gOiBjcmVhdGVcblJlc3VsdHMgPC4uIFNwYXRpYWxKb2luXG5SZXN1bHRzIFwiMVwiIC0tKiBcIjFcIiBTSk1hc3RlciBcblNKUmVzdWx0IFwiKlwiIC0tKiBcIjFcIiBSZXN1bHRzIFxuU0pSZXN1bHQgPC4uIFNKTWFzdGVyIDogY3JlYXRlXG5BbGdvcml0aG1SZXN1bHQgXCIqXCIgLS0qIFwiMVwiIFNKUmVzdWx0XG5BbGdvcml0aG1SZXN1bHQgPC4uIFJlc3VsdHNcblNKTWFzdGVyIC4uPiBBbGdvcml0aG1SZXN1bHQgOiBjcmVhdGUiLCJtZXJtYWlkIjoie1xuICBcInRoZW1lXCI6IFwiZGVmYXVsdFwiXG59IiwidXBkYXRlRWRpdG9yIjpmYWxzZSwiYXV0b1N5bmMiOnRydWUsInVwZGF0ZURpYWdyYW0iOmZhbHNlfQ)

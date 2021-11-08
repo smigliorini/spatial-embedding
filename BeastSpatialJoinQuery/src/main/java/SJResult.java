@@ -14,6 +14,10 @@ public class SJResult {
 
     public SJResult() {
         SJResultMap = new HashMap<>();
+        SJResultMap.put(JoinAlgorithms.BNLJ,new AlgorithmResult());
+        SJResultMap.put(JoinAlgorithms.PBSM,new AlgorithmResult());
+        SJResultMap.put(JoinAlgorithms.DJ,new AlgorithmResult());
+        SJResultMap.put(JoinAlgorithms.REPJ,new AlgorithmResult());
     }
 
     public void setDataset1Size(long dataset1Size) {

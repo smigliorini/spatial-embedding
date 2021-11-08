@@ -7,6 +7,11 @@ public class SpatialJoin {
         Options options = new Options();
         CommandLineParser parser = new GnuParser();
         options.addOption("s", "safe", false, "Save the partial results to avoid loosing them due to errors at run time");
+        options.addOption("b", "bnlj", false, "Execute the spatial joins using the BNLJ algorithm");
+        options.addOption("p", "pbsm", false, "Execute the spatial joins using the PBSM algorithm");
+        options.addOption("d", "dj", false, "Execute the spatial joins using the DJ algorithm");
+        options.addOption("r", "repj", false, "Execute the spatial joins using the REPJ algorithm");
+        options.addOption("h", "help", false, "Print this message");
         options.addOption("i", "input", true, "Specify the file containing the list of datasets to use for the spatial join");
         options.addOption("o", "output", true, "Specify the directory that will contain the files with the statistical information regarding the spatial join executions");
 
@@ -15,6 +20,10 @@ public class SpatialJoin {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException ignored) {
+            formatter.printHelp(" ", options);
+            System.exit(1);
+        }
+        if(cmd.hasOption("h")){
             formatter.printHelp(" ", options);
             System.exit(1);
         }
@@ -46,15 +55,13 @@ public class SpatialJoin {
             System.exit(1);
         }
 
-        if (cmd.hasOption("s")) {
-            System.err.println("INFO: Executing in safe mode");
-            sjMaster.safeRun(cmd.getOptionValue("output", "."));
-        } else {
-            sjMaster.run();
-            sjMaster.getResults().toJson(cmd.getOptionValue("output", "."));
-            sjMaster.getResults().toCsv(cmd.getOptionValue("output", "."));
-        }
+        boolean[] algorithmToUse;
+        if (!cmd.hasOption("b") && !cmd.hasOption("p") && !cmd.hasOption("d") && !cmd.hasOption("r"))
+            algorithmToUse = new boolean[]{true,true,true,true};
+        else
+            algorithmToUse = new boolean[]{cmd.hasOption("b") ,cmd.hasOption("p") ,cmd.hasOption("d") ,cmd.hasOption("r")};
 
+        sjMaster.run(cmd.getOptionValue("output", "."),cmd.hasOption("s"),algorithmToUse);
         sjMaster.stop();
 
     }
