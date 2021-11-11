@@ -65,26 +65,24 @@ def gen_hist_from_file(dimx,dimy,dimz,file):
 		csv_reader = csv.DictReader(csv_file)
 		line_count = 0
 		for row in csv_reader:
-			if line_count == 0:
-				#print(f'Column names are: {", ".join(row)}')
-				line_count += 1
-			else:
-				#DEBUG print(f'\t{row["i0"]},{row["i1"]}: {row["num_features"]}, {row["size"]}, {row["num_points"]}, {row["avg_area"]}, {row["avg_side_length_0"]}, {row["avg_side_length_1"]}.')
-				x = int(row["i0"])
-				y = int(row["i1"])
-				if (dimz >= 1):
-					h0[x,y,0] = int(row["num_features"])
-				if (dimz >= 2):
-					h0[x,y,1] = int(row["size"])
-				if (dimz >= 3):
-					h0[x,y,2] = int(row["num_points"])
-				if (dimz >= 4):
-					h0[x,y,3] = float(row["avg_area"])
-				if (dimz >= 5):
-					h0[x,y,4] = float(row["avg_side_length_0"])
-				if (dimz >= 6):	
-					h0[x,y,5] = float(row["avg_side_length_1"])
-				line_count += 1
+			#DEBUG print(f'Column names are: {", ".join(row)}')
+			
+			#DEBUG print(f'\t{row["i0"]},{row["i1"]}: {row["num_features"]}, {row["size"]}, {row["num_points"]}, {row["avg_area"]}, {row["avg_side_length_0"]}, {row["avg_side_length_1"]}.')
+			x = int(row["i0"])
+			y = int(row["i1"])
+			if (dimz >= 1):
+				h0[x,y,0] = int(row["num_features"])
+			if (dimz >= 2):
+				h0[x,y,1] = int(row["size"])
+			if (dimz >= 3):
+				h0[x,y,2] = int(row["num_points"])
+			if (dimz >= 4):
+				h0[x,y,3] = float(row["avg_area"])
+			if (dimz >= 5):
+				h0[x,y,4] = float(row["avg_side_length_0"])
+			if (dimz >= 6):	
+				h0[x,y,5] = float(row["avg_side_length_1"])
+			line_count += 1
 		print(f'Processed {line_count} lines.')
 	return h0
 
