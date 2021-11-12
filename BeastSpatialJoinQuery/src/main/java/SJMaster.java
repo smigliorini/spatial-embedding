@@ -11,9 +11,7 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.FileReader;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,31 +22,32 @@ import java.util.regex.Pattern;
 public class SJMaster {
     private final ArrayList<String> datasets;
     private final ArrayList<String> datasets_grid;
-    private Results results ;
+    private final Results results ;
     private final SparkSession sparkSession;
-    private JavaSparkContext sparkContext;
+    private final JavaSparkContext sparkContext;
     private final ByteArrayOutputStream baos;
 
+    private JavaRDD<IFeature> envelope1;
+    private JavaRDD<IFeature> envelope2;
+    private JavaRDD<IFeature> envelope1_par;
+    private JavaRDD<IFeature> envelope2_par;
     /**
      *
      * @param pathfile path of the file containing the list of the datasets to be used and their relative partitioned version.
      * @param baos {@link ByteArrayOutputStream} where the StdOut is redirect and that can be used to found the
      *                                          information about the spark execution.
      */
-    public SJMaster(String pathfile, ByteArrayOutputStream baos) {
+    public SJMaster(String pathfile, ByteArrayOutputStream baos) throws IOException {
         datasets = new ArrayList<>();
         datasets_grid = new ArrayList<>();
         this.baos = baos;
-        try {
-            BufferedReader br = new BufferedReader(new FileReader(pathfile));
-            String line = br.readLine();
-            while (line != null) {
-                datasets.add(line.split(",")[0]);
-                datasets_grid.add(line.split(",")[1].replace("\n",""));
-                line = br.readLine();
-            }
-        }catch (Exception e){
-            e.printStackTrace();
+
+        BufferedReader br = new BufferedReader(new FileReader(pathfile));
+        String line = br.readLine();
+        while (line != null) {
+            datasets.add(line.split(",")[0]);
+            datasets_grid.add(line.split(",")[1].replace("\n", ""));
+            line = br.readLine();
         }
 
         SparkConf conf = new SparkConf().setAppName("Beast Example");
@@ -79,22 +78,35 @@ public class SJMaster {
     /**
      * Execute the spatial join between every couple of datasets and store the results.
      * The results can be retrieved using the method {@link #getResults()}
+     * @param path Specify the folder where the results will be saved
+     * @param safe If set to true it will periodically save the results to avoid losing data especially on long executions.
+     * @param algorithmToUse An array that specify which spatial join algorithms has to be used.
      */
-    public void run(){
+    public void run(String path, boolean safe, boolean[] algorithmToUse){
+
+        int totalNumCouple = (datasets.size()* (datasets.size()-1))/2;
+        int countCouple = 1;
         BeastOptions beastOptions = new BeastOptions().set("separator", ',');
         String format = "envelope(0,1,2,3)";
         for (int i = 0; i < datasets.size() - 1 ; i++){
-            JavaRDD<IFeature> envelope1 = SpatialReader.readInput(sparkContext, beastOptions, datasets.get(i), format);
-            JavaRDD<IFeature> envelope1_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid.get(i), format);
+            envelope1 = SpatialReader.readInput(sparkContext, beastOptions, datasets.get(i), format);
+            envelope1_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid.get(i), format);
             for (int j = i+1; j < datasets.size(); j++){
-                JavaRDD<IFeature> envelope2 = SpatialReader.readInput(sparkContext, beastOptions, datasets.get(j), format);
-                JavaRDD<IFeature> envelope2_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid.get(j), format);
+                System.err.println("INFO: Working on the couple n° " + countCouple +" of " + totalNumCouple+".");
+                countCouple+=1;
+                envelope2 = SpatialReader.readInput(sparkContext, beastOptions, datasets.get(j), format);
+                envelope2_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid.get(j), format);
                 results.addEntry(datasets.get(i) + "," + datasets.get(j),
-                        executeSJ(envelope1,envelope2,envelope1_par,envelope2_par));
+                        executeSJ(algorithmToUse));
+                if(safe){
+                    results.toCsv(path);
+                    results.toJson(path);
+                }
             }
         }
+        results.toCsv(path);
+        results.toJson(path);
     }
-
 
     /**
      * Terminate the Spark session
@@ -105,13 +117,10 @@ public class SJMaster {
 
     /**
      * * Execute the 4 different SpatialJoin between the two datasets.
-     * @param envelope1 The first dataset
-     * @param envelope2 The second dataset
-     * @param envelope1_par The first dataset partitioned
-     * @param envelope2_par The second dataset partitioned
      * @return A structure containing all the statistical information about the execution of the 4 spatial join.
+     * @param algorithmToUse An array that specify which spatial join algorithms has to be used.
      */
-    private SJResult executeSJ(JavaRDD<IFeature> envelope1, JavaRDD<IFeature> envelope2, JavaRDD<IFeature> envelope1_par,JavaRDD<IFeature> envelope2_par) {
+    private SJResult executeSJ(boolean[] algorithmToUse) {
         SJResult singleResults = new SJResult();
         SpatialJoinAlgorithms.ESJPredicate intersects = SpatialJoinAlgorithms.ESJPredicate.Intersects;
         try {
@@ -119,47 +128,75 @@ public class SJMaster {
             singleResults.setDataset1Size(envelope1.count());
             singleResults.setDataset1GridNPartitions(envelope1_par.getNumPartitions());
             singleResults.setDataset2GridNPartitions(envelope2_par.getNumPartitions());
-            LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
             baos.reset();
-            RDD<Tuple2<IFeature, IFeature>> sjResults;
-            sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), intersects,
-                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ, mbr, new BeastOptions());
-            singleResults.setResultSJSize(sjResults.count());
-            singleResults.addJoinResult(JoinAlgorithms.BNLJ, extractSingleSJ(baos.toString(), mbr.count()));
-            baos.reset();
-            mbr.reset();
+            if(algorithmToUse[0])
+                executeBNLJ(singleResults,intersects);
+            if(algorithmToUse[1])
+                executePBSM(singleResults,intersects);
+            if(algorithmToUse[2])
+                executeDJ(singleResults,intersects);
+            if(algorithmToUse[3])
+                executeREPJ(singleResults,intersects);
 
-            sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), intersects,
-                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM, mbr, new BeastOptions());
-            System.err.println(sjResults.first());
-            singleResults.addJoinResult(JoinAlgorithms.PBSM, extractSingleSJ(baos.toString(), mbr.count()));
-            baos.reset();
-            mbr.reset();
-
-            sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2_par.rdd(), intersects,
-                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ, mbr, new BeastOptions());
-            System.err.println(sjResults.first());
-            singleResults.addJoinResult(JoinAlgorithms.DJ, extractSingleSJ(baos.toString(), mbr.count()));
-            mbr.reset();
-
-            if (envelope1.count() > envelope2.count()) {
-                baos.reset();
-                sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2.rdd(), intersects,
-                        SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
-            } else {
-                baos.reset();
-                sjResults = SpatialJoin.spatialJoin(envelope2_par.rdd(), envelope1.rdd(), intersects,
-                        SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
-            }
-            System.err.println(sjResults.first());
-            singleResults.addJoinResult(JoinAlgorithms.REPJ, extractSingleSJ(baos.toString(), mbr.count()));
-            baos.reset();
-            mbr.reset();
         }catch (Exception e){
             e.printStackTrace();
         }
         return singleResults;
     }
+
+    private void executeBNLJ(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
+        System.err.println("INFO:\tExecuting BNLJ...");
+        LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
+        baos.reset();
+        RDD<Tuple2<IFeature, IFeature>> sjResults;
+        sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), esjPredicate,
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ, mbr, new BeastOptions());
+        singleResults.setResultSJSize(sjResults.count());
+        singleResults.addJoinResult(JoinAlgorithms.BNLJ, extractSingleSJ(baos.toString(), mbr.count()));
+        baos.reset();
+    }
+
+    private void executePBSM(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
+        System.err.println("INFO:\tExecuting PBSM...");
+        LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
+        baos.reset();
+        RDD<Tuple2<IFeature, IFeature>> sjResults;
+        sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), esjPredicate,
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM, mbr, new BeastOptions());
+        singleResults.setResultSJSize(sjResults.count());
+        singleResults.addJoinResult(JoinAlgorithms.PBSM, extractSingleSJ(baos.toString(), mbr.count()));
+        baos.reset();
+    }
+    private void executeDJ(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
+        System.err.println("INFO:\tExecuting DJ...");
+        LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
+        baos.reset();
+        RDD<Tuple2<IFeature, IFeature>> sjResults;
+        sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2_par.rdd(), esjPredicate,
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ, mbr, new BeastOptions());
+        singleResults.setResultSJSize(sjResults.count());
+        singleResults.addJoinResult(JoinAlgorithms.DJ, extractSingleSJ(baos.toString(), mbr.count()));
+        baos.reset();
+    }
+    private void executeREPJ(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
+        System.err.println("INFO:\tExecuting REPJ...");
+        LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
+        baos.reset();
+        RDD<Tuple2<IFeature, IFeature>> sjResults;
+        if (envelope1.count() > envelope2.count()) {
+            baos.reset();
+            sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2.rdd(), esjPredicate,
+                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
+        } else {
+            baos.reset();
+            sjResults = SpatialJoin.spatialJoin(envelope2_par.rdd(), envelope1.rdd(), esjPredicate,
+                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
+        }
+        singleResults.setResultSJSize(sjResults.count());
+        singleResults.addJoinResult(JoinAlgorithms.REPJ, extractSingleSJ(baos.toString(), mbr.count()));
+        baos.reset();
+    }
+
 
     /**
      * Extracts from the log of the execution the information relative to the execution of a single SJ
@@ -198,7 +235,7 @@ public class SJMaster {
 
     /**
      * Extract from the log of the spatial join the size of the joins.
-     * For every two partitons of the data to which the join is applied, the size is intended as the multiplication between
+     * For every two partitions of the data to which the join is applied, the size is intended as the multiplication between
      * the size of the two partition.
      * @param execOutput the log of the execution of the spatial join
      * @return An array containing the join sizes.
