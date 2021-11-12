@@ -20,6 +20,17 @@ Y_MAX = 128
 
 SIZE = 128
 
+def count_frequency_1(a):
+	freq = np.zeros(11)
+	for i in range(a.shape[0]):
+		if (a[i] == 0):
+			index = 0
+		else:
+			index = math.ceil(a[i]*10)
+		if (index >= 11):
+			index = 10
+		freq[index] += 1
+	return freq
 
 def count_frequency(a,dimx,dimy):
 	freq = np.zeros(11)
@@ -518,7 +529,8 @@ def shift_pos(a):
 				else:
 					shift_a[i,j,k] = a[i,j,k] + abs(min)
 	return shift_a
-def nor_with_min_max(a,log,min,max):
+def nor_with_min_max(a,c,min,max):
+	# if c > 0 then it applied the normalization of x: log(1+c*x)/log(1+c)
 	print("Normalizing with given min max...")
 	if (a.ndim == 4):
 		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2],a.shape[3]))
@@ -530,29 +542,27 @@ def nor_with_min_max(a,log,min,max):
 		if ((i % math.ceil(a.shape[0]/10)) == 0):
 			print("Done: ",i,"/",a.shape[0])
 		if (a.ndim == 1):
-			if (log == 1):
-				norm_a[i] = (math.log(a[i]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
-			else:
-				norm_a[i] = (a[i] - min)/(max - min)
+			norm_value = (a[i] - min)/(max - min)
+			if (c > 0):
+				norm_value = math.log(1+c*norm_value)/math.log(1+c)
+			norm_a[i] = norm_value
 			continue
 		for j in range(a.shape[1]):
 			for k in range(a.shape[2]):
 				if (a.ndim == 4):
 					for l in range(a.shape[3]):
-						if (log == 1):
-							error = math.log(a[i,j,k,l]+1) - math.log(min[l]+1)
-							den = math.log(max[l]+1) - math.log(min[l]+1)
-						else:
-							error = a[i,j,k,l] - min[l]
-							den = max[l] - min[l]
-						norm_a[i,j,k,l] = error/den
+						norm_value = (a[i,j,k,l] - min[l])/(max[l] - min[l])
+						if (c > 0):
+							norm_value = math.log(1+c*norm_value)/math.log(1+c)
+						norm_a[i,j,k,l] = norm_value
 				else:
-					if (log == 1):
-						norm_a[i,j,k] = (math.log(a[i,j,k]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
-					else:
-						norm_a[i,j,k] = (a[i,j,k] - min)/(max - min)
+					norm_value = (a[i,j,k] - min)/(max - min)
+					if (c > 0):
+						norm_value = math.log(1+c*norm_value)/math.log(1+c)
+					norm_a[i,j,k] = norm_value
 	return norm_a
-def nor_a(a,log):
+def nor_a(a,c):
+	# if c > 0 then it applied the normalization of x: log(1+c*x)/log(1+c)
 	print("Normalizing a...")
 	if (a.ndim == 4):
 		min = np.ones(a.shape[3])*10000000000
@@ -589,18 +599,17 @@ def nor_a(a,log):
 			for k in range(a.shape[2]):
 				if (a.ndim == 4):
 					for l in range(a.shape[3]):
-						if (log == 1):
-							error = math.log(a[i,j,k,l]+1) - math.log(min[l]+1)
-							den = math.log(max[l]+1) - math.log(min[l]+1)
+						norm_value = (a[i,j,k,l] - min[l])/(max[l] - min[l])
+						if (c > 0):
+							norm_a[i,j,k,l] = math.log(1+c*norm_value)/math.log(1+c)
 						else:
-							error = a[i,j,k,l] - min[l]
-							den = max[l] - min[l]
-						norm_a[i,j,k,l] = error/den
+							norm_a[i,j,k,l] = norm_value
 				else:
-					if (log == 1):
-						norm_a[i,j,k] = (math.log(a[i,j,k]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
+					norm_value = (a[i,j,k] - min)/(max - min)
+					if (c > 0):
+						norm_a[i,j,k] = math.log(1+c*norm_value)/math.log(1+c)
 					else:
-						norm_a[i,j,k] = (a[i,j,k] - min)/(max - min)
+						norm_a[i,j,k] = norm_value
 	return norm_a
 def nor_g(g,log):
 	print("Normalizing g...")
