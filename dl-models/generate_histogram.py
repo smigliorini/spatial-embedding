@@ -91,7 +91,7 @@ def gen_hist_from_file(dimx,dimy,dimz,file):
 #
 # loading local histograms and generating global histograms
 #
-def gen_input_from_file(dimx,dimy,dimz,path,mbrFile,suffix):
+def gen_input_from_file(dimx,dimy,dimz,path,mbrFile, rqFile, suffix):
 #
 # path: directory where the files containing the histograms are located: for example histograms_small
 # mbrFile: the name of the file containing the MBR of the datasets the histograms refer to
@@ -109,6 +109,15 @@ def gen_input_from_file(dimx,dimy,dimz,path,mbrFile,suffix):
 			name = row["datasetName"]
 			mbr[name] = dict([('minx', float(row["minX"])), ('miny', float(row["minY"])), ('maxx', float(row["maxX"])), ('maxy', float(row["maxY"]))])
 			line_count += 1
+
+	rq = {}
+	with open(rqFile, mode='r') as csv_file:
+		csv_reader = csv.DictReader(csv_file)
+		line_count = 0
+		for row in csv_reader:
+			rq[row["dataset"]+"_"+row["numQuery"]] = {"cardinality": row["cardinality"], "minx": row["minx"],
+														  "maxx": row["maxx"], "miny": row["miny"], "maxy": row["maxy"]}
+
 
 	files = get_files_path(path)
 	print('Found {0} files'.format(len(files)))
@@ -144,7 +153,7 @@ def gen_global_hist(h0, dimx, dimy, mbr):
 	ysizeG = (GLOBAL_Y_MAX - GLOBAL_Y_MIN) / dimy
 	#print('Global Cell sides: ',xsizeG," x ",ysizeG)
 
-	hg = np.zeros((dimx, dimy))
+	hg = np.zeros((dimx, dimy, 1))
 
 	#card = num_features == 0
 
@@ -518,40 +527,38 @@ def shift_pos(a):
 				else:
 					shift_a[i,j,k] = a[i,j,k] + abs(min)
 	return shift_a
-def nor_with_min_max(a,log,min,max):
-	print("Normalizing with given min max...")
-	if (a.ndim == 4):
-		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2],a.shape[3]))
-	elif (a.ndim == 1):
-		norm_a = np.zeros((a.shape[0]))
-	else:
-		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2]))
-	for i in range(a.shape[0]):
-		if ((i % math.ceil(a.shape[0]/10)) == 0):
-			print("Done: ",i,"/",a.shape[0])
-		if (a.ndim == 1):
-			if (log == 1):
-				norm_a[i] = (math.log(a[i]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
-			else:
-				norm_a[i] = (a[i] - min)/(max - min)
-			continue
-		for j in range(a.shape[1]):
-			for k in range(a.shape[2]):
-				if (a.ndim == 4):
-					for l in range(a.shape[3]):
-						if (log == 1):
-							error = math.log(a[i,j,k,l]+1) - math.log(min[l]+1)
-							den = math.log(max[l]+1) - math.log(min[l]+1)
-						else:
-							error = a[i,j,k,l] - min[l]
-							den = max[l] - min[l]
-						norm_a[i,j,k,l] = error/den
-				else:
-					if (log == 1):
-						norm_a[i,j,k] = (math.log(a[i,j,k]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
-					else:
-						norm_a[i,j,k] = (a[i,j,k] - min)/(max - min)
-	return norm_a
+def nor_with_min_max(a,c,min,max):
+        # if c > 0 then it applied the normalization of x: log(1+c*x)/log(1+c)
+        print("Normalizing with given min max...")
+        if (a.ndim == 4):
+                norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2],a.shape[3]))
+        elif (a.ndim == 1):
+                norm_a = np.zeros((a.shape[0]))
+        else:
+                norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2]))
+        for i in range(a.shape[0]):
+                if ((i % math.ceil(a.shape[0]/10)) == 0):
+                        print("Done: ",i,"/",a.shape[0])
+                if (a.ndim == 1):
+                        norm_value = (a[i] - min)/(max - min)
+                        if (c > 0):
+                                norm_value = math.log(1+c*norm_value)/math.log(1+c)
+                        norm_a[i] = norm_value
+                        continue
+                for j in range(a.shape[1]):
+                        for k in range(a.shape[2]):
+                                if (a.ndim == 4):
+                                        for l in range(a.shape[3]):
+                                                norm_value = (a[i,j,k,l] - min[l])/(max[l] - min[l])
+                                                if (c > 0):
+                                                        norm_value = math.log(1+c*norm_value)/math.log(1+c)
+                                                norm_a[i,j,k,l] = norm_value
+                                else:
+                                        norm_value = (a[i,j,k] - min)/(max - min)
+                                        if (c > 0):
+                                                norm_value = math.log(1+c*norm_value)/math.log(1+c)
+                                        norm_a[i,j,k] = norm_value
+        return norm_a
 def nor_a(a,log):
 	print("Normalizing a...")
 	if (a.ndim == 4):
