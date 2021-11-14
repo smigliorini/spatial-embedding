@@ -2,7 +2,7 @@
 Execute the spatial join between every couple of datasets using 4 different join algorithms.
 ## Usage
 The program accepts 2 parameters and 5 flags:
-* `-i,--input <arg>`<br/>Specify the file containing the list of datasets to use for the spatial join. 
+* `-i,--input <arg>`<br/>Specify the file containing the list of couple of datasets to use for the spatial join. 
 If not specified the program will expect to find the datasets list inside the file `datasets.txt`
 * `-o,--output <arg>` <br/>Specify the directory that will contain the files with the statistical information regarding the
 spatial join executions. If not specified the program will use the current directory.
@@ -14,12 +14,12 @@ errors at run time
 * `-r,--repj `Execute the spatial joins using the REPJ algorithm
 
 ## Input file
-The program will expect to find inside a TXT file a list of the datasets to be used both in their partitioned 
+The program will expect to find inside a TXT file a list of the couple of datasets to be used both in their partitioned 
 and non-partitioned version. An example of the file is reported below.
 ```
-non_partitioned/medium_datasets/diagonal_001.csv,partitioned/medium_datasets/diagonal_001/
-non_partitioned/medium_datasets/gaussian_001.csv,partitioned/medium_datasets/gaussian_001/
-non_partitioned/small_datasets/diagonal_001.csv,partitioned/small_datasets/diagonal_001/
+not_partitioned/dataset_01.csv,partitioned/dataset_01/,not_partitioned/dataset_02.csv,partitioned/dataset_02/
+not_partitioned/dataset_01.csv,partitioned/dataset_01/,not_partitioned/dataset_03.csv,partitioned/dataset_03/
+not_partitioned/dataset_02.csv,partitioned/dataset_02/,not_partitioned/dataset_03.csv,partitioned/dataset_03/
 ```
 ## Results
 The results are available in a detailed way as a JSON file and in a more condensed version as a CSV file. 
