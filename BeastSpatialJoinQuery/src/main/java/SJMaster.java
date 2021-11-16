@@ -20,8 +20,10 @@ import java.util.regex.Pattern;
  * Execute the spatial joins between the datsets and estract form the logs the statistical information needed.
  */
 public class SJMaster {
-    private final ArrayList<String> datasets;
-    private final ArrayList<String> datasets_grid;
+    private final ArrayList<String> datasets1;
+    private final ArrayList<String> datasets_grid1;
+    private final ArrayList<String> datasets2;
+    private final ArrayList<String> datasets_grid2;
     private final Results results ;
     private final SparkSession sparkSession;
     private final JavaSparkContext sparkContext;
@@ -38,18 +40,23 @@ public class SJMaster {
      *                                          information about the spark execution.
      */
     public SJMaster(String pathfile, ByteArrayOutputStream baos) throws IOException {
-        datasets = new ArrayList<>();
-        datasets_grid = new ArrayList<>();
+        datasets1 = new ArrayList<>();
+        datasets_grid1 = new ArrayList<>();
+        datasets2 = new ArrayList<>();
+        datasets_grid2 = new ArrayList<>();
         this.baos = baos;
 
         BufferedReader br = new BufferedReader(new FileReader(pathfile));
         String line = br.readLine();
+        String[] tmp;
         while (line != null) {
-            datasets.add(line.split(",")[0]);
-            datasets_grid.add(line.split(",")[1].replace("\n", ""));
+            tmp = line.split(",");
+            datasets1.add(tmp[0]);
+            datasets_grid1.add(tmp[1]);
+            datasets2.add(tmp[2]);
+            datasets_grid2.add(tmp[3].replace("\n", ""));
             line = br.readLine();
         }
-
         SparkConf conf = new SparkConf().setAppName("Beast Example");
         if (!conf.contains("spark.master"))
             conf.setMaster("local[*]");
@@ -80,28 +87,26 @@ public class SJMaster {
      * The results can be retrieved using the method {@link #getResults()}
      * @param path Specify the folder where the results will be saved
      * @param safe If set to true it will periodically save the results to avoid losing data especially on long executions.
-     * @param algorithmToUse An array that specify which spatial join algorithms has to be used.
+     * @param algorithmsToUse An array that specify which spatial join algorithms has to be used.
      */
-    public void run(String path, boolean safe, boolean[] algorithmToUse){
+    public void run(String path, boolean safe, boolean[] algorithmsToUse){
 
-        int totalNumCouple = (datasets.size()* (datasets.size()-1))/2;
-        int countCouple = 1;
+        int totalNumCouple = (datasets1.size());
         BeastOptions beastOptions = new BeastOptions().set("separator", ',');
         String format = "envelope(0,1,2,3)";
-        for (int i = 0; i < datasets.size() - 1 ; i++){
-            envelope1 = SpatialReader.readInput(sparkContext, beastOptions, datasets.get(i), format);
-            envelope1_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid.get(i), format);
-            for (int j = i+1; j < datasets.size(); j++){
-                System.err.println("INFO: Working on the couple n° " + countCouple +" of " + totalNumCouple+".");
-                countCouple+=1;
-                envelope2 = SpatialReader.readInput(sparkContext, beastOptions, datasets.get(j), format);
-                envelope2_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid.get(j), format);
-                results.addEntry(datasets.get(i) + "," + datasets.get(j),
-                        executeSJ(algorithmToUse));
-                if(safe){
-                    results.toCsv(path);
-                    results.toJson(path);
-                }
+        for (int i = 0; i < totalNumCouple ; i++){
+            System.err.println("INFO: Working on the couple n° " + (i+1) +" of " + totalNumCouple+".");
+
+            envelope1 = SpatialReader.readInput(sparkContext, beastOptions, datasets1.get(i), format);
+            envelope1_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid1.get(i), format);
+            envelope2 = SpatialReader.readInput(sparkContext, beastOptions, datasets2.get(i), format);
+            envelope2_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid2.get(i), format);
+
+            results.addEntry(datasets1.get(i) + "," + datasets2.get(i),
+                    executeSJ(algorithmsToUse));
+            if(safe){
+                results.toCsv(path);
+                results.toJson(path);
             }
         }
         results.toCsv(path);
@@ -118,9 +123,9 @@ public class SJMaster {
     /**
      * * Execute the 4 different SpatialJoin between the two datasets.
      * @return A structure containing all the statistical information about the execution of the 4 spatial join.
-     * @param algorithmToUse An array that specify which spatial join algorithms has to be used.
+     * @param algorithmsToUse An array that specify which spatial join algorithms has to be used.
      */
-    private SJResult executeSJ(boolean[] algorithmToUse) {
+    private SJResult executeSJ(boolean[] algorithmsToUse) {
         SJResult singleResults = new SJResult();
         SpatialJoinAlgorithms.ESJPredicate intersects = SpatialJoinAlgorithms.ESJPredicate.Intersects;
         try {
@@ -129,13 +134,13 @@ public class SJMaster {
             singleResults.setDataset1GridNPartitions(envelope1_par.getNumPartitions());
             singleResults.setDataset2GridNPartitions(envelope2_par.getNumPartitions());
             baos.reset();
-            if(algorithmToUse[0])
+            if(algorithmsToUse[0])
                 executeBNLJ(singleResults,intersects);
-            if(algorithmToUse[1])
+            if(algorithmsToUse[1])
                 executePBSM(singleResults,intersects);
-            if(algorithmToUse[2])
+            if(algorithmsToUse[2])
                 executeDJ(singleResults,intersects);
-            if(algorithmToUse[3])
+            if(algorithmsToUse[3])
                 executeREPJ(singleResults,intersects);
 
         }catch (Exception e){
