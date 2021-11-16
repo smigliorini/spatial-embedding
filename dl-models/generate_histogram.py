@@ -171,8 +171,8 @@ def gen_global_hist(h0, dimx, dimy, mbr):
 			cell = h0[i, j]
 			if (cell[0] == 0):
 				continue;
-			xC = mbr['minx'] + xsize * i
-			yC = mbr['miny'] + ysize * j
+			xC = mbr['minx'] + xsize * j
+			yC = mbr['miny'] + ysize * i
 			#print('Cell coord: (',xC,',',yC,',',xC+xsize,',',yC+ysize,')')
 			firstCellGcol = math.floor(xC / xsizeG)
 			firstCellGrow = math.floor(yC / ysizeG)
@@ -568,7 +568,7 @@ def nor_with_min_max(a,c,min,max):
                                                 norm_value = math.log(1+c*norm_value)/math.log(1+c)
                                         norm_a[i,j,k] = norm_value
         return norm_a
-def nor_a(a,log):
+def nor_a(a,c):
 	print("Normalizing a...")
 	if (a.ndim == 4):
 		min = np.ones(a.shape[3])*10000000000
