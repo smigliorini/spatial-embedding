@@ -34,12 +34,41 @@ class RQ_sel_CNN_3L_DENSE(Model):
       # Third CNN => BN => POOL layer
       layers.Conv2D(f3, (3, 3), activation='relu', padding='same', strides=2),
       layers.BatchNormalization(),
-      layers.MaxPooling2D(pool_size=(2, 2)),
+      #layers.MaxPooling2D(pool_size=(2, 2)),
       layers.Flatten(),
       layers.Dense(f1, activation='relu'),
       layers.BatchNormalization(),
       layers.Dropout(0.5),
       layers.Dense(1, activation="linear")
+    ])
+  def call(self, x):
+    sel = self.predictor(x)
+    return sel
+class RQ_sel_CNN_2L_DENSE(Model):
+  def __init__(self, dimx, dimy, dimz, f1, f2):
+    # f1=16 f2=32
+    super(RQ_sel_CNN_2L_DENSE, self).__init__()
+    self.dimx = dimx
+    self.dimy = dimy
+    self.dimz = dimz
+    self.f1 = f1
+    self.f2 = f2
+    self.predictor = tf.keras.Sequential([
+      # INPUT layer
+      layers.Input(shape=(dimx, dimy, dimz)),
+      # First CNN => BN => POOL layer
+      layers.Conv2D(f1, (3, 3), activation='relu', padding='same', strides=2),
+      layers.BatchNormalization(),
+      # deleted layers.MaxPooling2D(pool_size=(2, 2)),
+      # Second CNN => BN => POOL layer
+      layers.Conv2D(f2, (3, 3), activation='relu', padding='same', strides=2),
+      layers.BatchNormalization(),
+      layers.MaxPooling2D(pool_size=(2, 2)),
+      layers.Flatten(),
+      layers.Dense(f1, activation='relu'),
+      layers.BatchNormalization(),
+      layers.Dropout(0.5),
+      layers.Dense(1, activation="sigmoid")
     ])
   def call(self, x):
     sel = self.predictor(x)
@@ -63,8 +92,9 @@ class RQ_sel_CNN_1L_DENSE(Model):
       layers.Flatten(),
       layers.Dense(f1, activation='relu'),
       layers.BatchNormalization(),
-      layers.Dropout(0.5),
-      layers.Dense(1, activation="linear")
+      layers.Dropout(0.3),
+      #layers.Dense(1, activation="linear"),
+      layers.Dense(1, activation="relu")
     ])
   def call(self, x):
     sel = self.predictor(x)
