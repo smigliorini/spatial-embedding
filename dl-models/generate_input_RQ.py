@@ -38,12 +38,12 @@ Y_MAX_REF = 10
 def get_embedding(local_enc, global_enc, rq_hist, datasetFile, mbr):
     # get local histogram
     hist_local = gh.gen_hist_from_file(DIM_H_X,DIM_H_Y,DIM_H_Z,datasetFile)
-    hist_local_norm = gh.nor_with_min_max(hist_local.reshape((1,DIM_H_X,DIM_H_Y,DIM_H_Z)), 1, NORM_MIN, NORM_MAX)
+    hist_local_norm = gh.nor_a_ab(hist_local.reshape((1,DIM_H_X,DIM_H_Y,DIM_H_Z)), 1, NORM_MIN, NORM_MAX)
     emb_local = local_enc.encoder(hist_local_norm.reshape((1,DIM_H_X,DIM_H_Y,DIM_H_Z)))
 
-    # computing globla histogram
+    # computing global histogram
     hist_glob = gh.gen_global_hist(hist_local, DIM_H_X, DIM_H_Y, mbr)
-    hist_glob_norm = gh.nor_with_min_max(hist_glob.reshape((1,DIM_H_X,DIM_H_Y,DIM_HG_Z)), 1, NORM_MIN_G, NORM_MAX_G)
+    hist_glob_norm = gh.nor_g_ab(hist_glob.reshape((1,DIM_H_X,DIM_H_Y,DIM_HG_Z)), 1, NORM_MIN_G, NORM_MAX_G)
     emb_global = global_enc.encoder(hist_glob_norm.reshape((1,DIM_H_X,DIM_H_Y,DIM_HG_Z)))
 
     # computing embedding of rq_histogram
@@ -96,7 +96,7 @@ def gen_rq_input_from_file(local_enc, global_enc, rqFile, mbrFile, resultFile, c
         # Reading Cardinality of datasets
         card = {}
         with open(cardFile, mode='r') as csv_file:
-            csv_reader = csv.DictReader(csv_file, delimiter=',')
+            csv_reader = csv.DictReader(csv_file, delimiter=delim)
             line_count = 0
             for row in csv_reader:
                 if (line_count == 0):
@@ -115,7 +115,7 @@ def gen_rq_input_from_file(local_enc, global_enc, rqFile, mbrFile, resultFile, c
         out_x = np.zeros((line_count,DIM_E_X,DIM_E_Y,(DIM_E_Z + 2*DIM_EG_Z)))
         out_y = np.zeros((line_count))
         with open(resultFile, mode='r') as csv_file:
-            csv_reader = csv.DictReader(csv_file,delimiter=',')
+            csv_reader = csv.DictReader(csv_file,delimiter=delim)
             line_count = 0
             count = 0
             max_selectivity = 0.5
@@ -127,9 +127,9 @@ def gen_rq_input_from_file(local_enc, global_enc, rqFile, mbrFile, resultFile, c
                 hist_RQ = gen_rq_layer(rq0, DIM_H_X, DIM_H_Y)
                 embL, embG, embRQ = get_embedding(local_enc, global_enc, hist_RQ, fileHist, mbr[row["dataset"]])
                 # embL, embG, embRQ = gi.get_embedding(local_enc, global_enc, fileHist, mbr[row["dataset"]])
-                print(embL.shape)
-                print(embG.shape)
-                print(embRQ.shape)
+                #print(embL.shape)
+                #print(embG.shape)
+                #print(embRQ.shape)
                 embL = embL.numpy().reshape((32, 32, 3))
                 embG = embG.numpy().reshape((32, 32, 2))
                 embRQ = embRQ.numpy().reshape((32, 32, 2))
@@ -143,12 +143,11 @@ def gen_rq_input_from_file(local_enc, global_enc, rqFile, mbrFile, resultFile, c
 
                 line_count += 1
                 print("line: ", str(line_count))
-                if (line_count == 10):
-                    out_y = gh.nor_with_min_max(out_y, 100, 0.0, max_selectivity)
-                    return out_x, out_y
+                #if (line_count == 10):
+                #    out_y = gh.nor_with_min_max(out_y, 100, 0.0, max_selectivity)
+                #    return out_x, out_y
             out_y = gh.nor_with_min_max(out_y, 100, 0.0, max_selectivity)
             return out_x, out_y
-
 
 def gen_rq_layer(rq, dimx, dimy):
     rq_layer = np.zeros((dimx, dimy, 1))
