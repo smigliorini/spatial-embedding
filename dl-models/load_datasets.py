@@ -36,7 +36,7 @@ p.plot_freq(freq0)
 #
 # or
 #
-autoenc_a_tot_log, a_tot_train, a_tot_test =  m.auto_encoder(1,1,0,128,128,6,3,1,a_tot_log,g_tot_log,b_tot,r_tot)
+autoenc_a_tot_log, a_tot_train, a_tot_test =  m.auto_encoder(1,1,0,128,128,6,3,2,a_tot_log,g_tot_log,b_tot,r_tot)
 enc_a_tot_test = autoenc_a_tot_log.encoder(a_tot_test).numpy()
 dec_a_tot_test = autoenc_a_tot_log.decoder(enc_a_tot_test).numpy()
 enc_a_tot_test_reshape = m.np.reshape(enc_a_tot_test, (-1,16,64,3))
@@ -45,4 +45,5 @@ p.plot_h6_mix_neg_emb(a_tot_test, dec_a_tot_test, enc_a_tot_test_reshape, 0, 10)
 autoenc_g_tot_log, g_tot_train, g_tot_test =  m.auto_encoder(1,0,1,128,128,6,3,2,a_tot_norm_log,g_tot_norm_log,b_tot,r_tot)
 enc_g_tot_test = autoenc_g_tot_log.encoder(g_tot_test).numpy()
 dec_g_tot_test = autoenc_g_tot_log.decoder(enc_g_tot_test).numpy()
-enc_g_tot_test_reshape = m.np.reshape(enc_g_tot_test, (-1,16,64,1))
+enc_g_tot_test_reshape = m.np.reshape(enc_g_tot_test, (-1,16,64,2))
+p.plot_h6_mix_neg_emb_g(g_tot_test, dec_g_tot_test, enc_g_tot_test_reshape, 0, 10)
