@@ -100,7 +100,7 @@ def gen_hist_from_file(dimx,dimy,dimz,file):
 #
 # loading local histograms and generating global histograms
 #
-def gen_input_from_file(dimx,dimy,dimz,path,mbrFile, rqFile, suffix):
+def gen_input_from_file(dimx,dimy,dimz,path,mbrFile, suffix):
 #
 # path: directory where the files containing the histograms are located: for example histograms_small
 # mbrFile: the name of the file containing the MBR of the datasets the histograms refer to
@@ -119,14 +119,12 @@ def gen_input_from_file(dimx,dimy,dimz,path,mbrFile, rqFile, suffix):
 			mbr[name] = dict([('minx', float(row["minX"])), ('miny', float(row["minY"])), ('maxx', float(row["maxX"])), ('maxy', float(row["maxY"]))])
 			line_count += 1
 
-	rq = {}
-	with open(rqFile, mode='r') as csv_file:
-		csv_reader = csv.DictReader(csv_file)
-		line_count = 0
-		for row in csv_reader:
-			rq[row["dataset"]+"_"+row["numQuery"]] = {"cardinality": row["cardinality"], "minx": row["minx"],
-														  "maxx": row["maxx"], "miny": row["miny"], "maxy": row["maxy"]}
-
+	#rq = {}
+	#with open(rqFile, mode='r') as csv_file:
+	#	csv_reader = csv.DictReader(csv_file)
+	#	line_count = 0
+	#	for row in csv_reader:
+	#		rq[row["dataset"]+"_"+row["numQuery"]] = {"cardinality": row["cardinality"], "minx": row["minx"], "maxx": row["maxx"], "miny": row["miny"], "maxy": row["maxy"]}
 
 	files = get_files_path(path)
 	print('Found {0} files'.format(len(files)))
@@ -162,7 +160,7 @@ def gen_global_hist(h0, dimx, dimy, mbr):
 	ysizeG = (GLOBAL_Y_MAX - GLOBAL_Y_MIN) / dimy
 	#print('Global Cell sides: ',xsizeG," x ",ysizeG)
 
-	hg = np.zeros((dimx, dimy, 1))
+	hg = np.zeros((dimx, dimy))
 
 	#card = num_features == 0
 
@@ -329,10 +327,10 @@ def generate(num,dimx,dimy,dimz,type):
 					r[i,j+jbis,k+kbis] = 1.0
 	print("Returning a, g, b and r")
 	return a, g, b, r
-def prr(a):
+def prr(a,scale):
 	for i in range(a.shape[0]-1,-1,-1):
 		for j in range(a.shape[1]):
-			v = int(a[i,j]*10) % 10
+			v = int(a[i,j]*scale) % 10
 			print(v, end='')
 		print("#")
 def prr_orig(a):
@@ -568,56 +566,29 @@ def nor_with_min_max(a,c,min,max):
                                                 norm_value = math.log(1+c*norm_value)/math.log(1+c)
                                         norm_a[i,j,k] = norm_value
         return norm_a
-def nor_a(a,c):
-	print("Normalizing a...")
-	if (a.ndim == 4):
-		min = np.ones(a.shape[3])*10000000000
-		max = np.ones(a.shape[3])*(-10000000000)
-	else:
-		min = 10000000000
-		max = (-10000000000)
+def nor_a_ab(a,c,min,max):
+	# c = 0: normalization MIN-MAX
+	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+x)
+	print("Normalizing a with AB approach...")
 	print("Computing min,max...")
-	for i in range(a.shape[0]):
-		for j in range(a.shape[1]):
-			for k in range(a.shape[2]):
-				if (a.ndim == 4):
-					for l in range(a.shape[3]):
-						if (a[i,j,k,l]<min[l]):
-							min[l] = a[i,j,k,l]
-						if (a[i,j,k,l]>max[l]):
-							max[l] = a[i,j,k,l]
-				else:
-					if (a[i,j,k]<min):
-						min = a[i,j,k]
-					if (a[i,j,k]>max):
-						max = a[i,j,k]
-	#Debug
-	print(min)
-	print(max)
-	if (a.ndim == 4):
-		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2],a.shape[3]))
+	if (c > 0):
+		a_norm = np.log(1 + c * a)
 	else:
-		norm_a = np.zeros((a.shape[0],a.shape[1],a.shape[2]))
-	for i in range(a.shape[0]):
-		if ((i % math.ceil(a.shape[0]/10)) == 0):
-                        print("Done: ",i,"/",a.shape[0])
-		for j in range(a.shape[1]):
-			for k in range(a.shape[2]):
-				if (a.ndim == 4):
-					for l in range(a.shape[3]):
-						norm_value = (a[i,j,k,l] - min[l])/(max[l] - min[l])
-						if (c > 0):
-							norm_a[i,j,k,l] = math.log(1+c*norm_value)/math.log(1+c)
-						else:
-							norm_a[i,j,k,l] = norm_value
-				else:
-					norm_value = (a[i,j,k] - min)/(max - min)
-					if (c > 0):
-						norm_a[i,j,k] = math.log(1+c*norm_value)/math.log(1+c)
-					else:
-						norm_a[i,j,k] = norm_value
-	return norm_a
-def nor_g(g,log):
+		a_norm = a
+	minimum = min
+	if (min == -1):
+		minimum = np.amin(a_norm, axis=(0, 1, 2))
+	maximum = max
+	if (max == -1):
+		maximum = np.amax(a_norm, axis=(0, 1, 2))
+	for z_dim in range(a_norm.shape[3]):
+		a_norm[:,:,:,z_dim]= ( a_norm[:,:,:,z_dim] - minimum[z_dim] ) /\
+								( maximum[z_dim]-minimum[z_dim] )
+	#Debug
+	print(minimum)
+	print(maximum)
+	return a_norm
+def nor_g(g,c):
 	print("Normalizing g...")
 	norm_g = np.zeros((g.shape[0],g.shape[1],g.shape[2]))
 	min = 10000000000.0
@@ -637,24 +608,42 @@ def nor_g(g,log):
                         print("Done: ",i,"/",g.shape[0])
 		for j in range(g.shape[1]):
 			for k in range(g.shape[2]):
-				if (log == 1):
-					norm_g[i,j,k] = (math.log(g[i,j,k]+1) - math.log(min+1))/(math.log(max+1) - math.log(min+1))
+				norm_value = (g[i,j,k] - min)/(max - min)
+				if (c > 0):
+					norm_g[i,j,k] = math.log(1+c*norm_value)/math.log(1+c)
 				else:
-					norm_g[i,j,k] = (g[i,j,k] - min)/(max - min)
+					norm_g[i,j,k] = norm_value
 	return norm_g
-def nor_b(b):
-	print("Normalizing b...")
-	norm_b = np.zeros(b.shape[0])
-	min = 10000000000
-	max = -10000000000
+def nor_g_ab(g,c,min,max):
+	# c = 0: normalization MIN-MAX
+	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+x)
+	print("Normalizing g with AB approach...")
 	print("Computing min,max...")
-	for i in range(b.shape[0]):
-		if (b[i]>max):
-			max = b[i]
-		if (b[i]<min):
-			min = b[i]
-	print("Modifying values...")
-	for i in range(b.shape[0]):
-		norm_b[i] = (b[i] - min)/(max - min)
-	
-	return norm_b
+	if (c > 0):
+		g_norm = np.log(1 + c * g)
+	else:
+		g_norm = g
+	minimum = min
+	if (min == -1):
+		minimum = np.amin(g_norm, axis=(0, 1, 2))
+	maximum = max
+	if (max == -1):
+		maximum = np.amax(g_norm, axis=(0, 1, 2))
+	for z_dim in range(g_norm.shape[3]):
+		g_norm[:,:,:,z_dim]= ( g_norm[:,:,:,z_dim] - minimum[z_dim] ) /\
+							( maximum[z_dim] - minimum[z_dim] )
+	#Debug
+	print(minimum)
+	print(maximum)
+	return g_norm
+# TODO	
+def denor_g(g_nor, c, min, max):
+	print("DeNormalizing b..	.")
+	g = np.zeros((g_nor.shape[0],g_nor.shape[1],g_nor.shape[2]))
+	for i in range(g.shape[0]):
+		if ((i % math.ceil(g.shape[0]/10)) == 0):
+			print("Done: ",i,"/",g.shape[0])
+		for j in range(g.shape[1]):
+			for k in range(g.shape[2]):				
+				norm_value = (g[i,j,k] - min)/(max - min)
+	return "todo"
