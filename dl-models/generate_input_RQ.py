@@ -146,7 +146,7 @@ def gen_rq_input_from_file(local_enc, global_enc, rqFile, mbrFile, resultFile, c
                 #if (line_count == 10):
                 #    out_y = gh.nor_with_min_max(out_y, 100, 0.0, max_selectivity)
                 #    return out_x, out_y
-            out_y = gh.nor_y_ab(out_y, 1, 0.0, max_selectivity)
+            out_y = gh.nor_y_ab(out_y, 200, 0.0, max_selectivity)
             return out_x, out_y
 
 def gen_rq_layer(rq, dimx, dimy):
