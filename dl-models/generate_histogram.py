@@ -680,14 +680,11 @@ def nor_g_ab(g,c,min,max):
 	print("MIN: if (c>0) them log(1+c*min) else min: ", minimum)
 	print("MAX: if (c>0) them log(1+c*max) else max: ", maximum)
 	return g_norm
-# TODO	
-def denor_g(g_nor, c, min, max):
-	print("DeNormalizing b..	.")
-	g = np.zeros((g_nor.shape[0],g_nor.shape[1],g_nor.shape[2]))
-	for i in range(g.shape[0]):
-		if ((i % math.ceil(g.shape[0]/10)) == 0):
-			print("Done: ",i,"/",g.shape[0])
-		for j in range(g.shape[1]):
-			for k in range(g.shape[2]):				
-				norm_value = (g[i,j,k] - min)/(max - min)
-	return "todo"
+def denorm_y_ab(y_nor, c, min, max):
+	print("DeNoromalizing y..	.")
+	min_log = math.log(1+c*min)
+	max_log = math.log(1+c*max)
+	delta = max_log - min_log
+	y = np.exp(y_nor * delta - min_log)
+	y = (y - 1)/c
+	return y
