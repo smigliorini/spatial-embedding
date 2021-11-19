@@ -614,6 +614,23 @@ def nor_g(g,c):
 				else:
 					norm_g[i,j,k] = norm_value
 	return norm_g
+def nor_y_ab(y,c,min,max):
+	# c = 0: normalization MIN-MAX
+	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+x)
+	print("Normalizing y with AB approach...")
+	if (c > 0):
+		y_norm = np.log(1 + c * y)
+	else:
+		y_norm = y
+	minimum = min
+	if (min == -1):
+		minimum = np.amin(y_norm, axis=(0))
+	maximum = max
+	if (max == -1):
+		maximum = np.amax(y_norm, axis=(0))
+	y_norm = ( y_norm - minimum ) / ( maximum - minimum )
+	return y_norm
+#
 def nor_g_ab(g,c,min,max):
 	# c = 0: normalization MIN-MAX
 	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+x)
