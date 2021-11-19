@@ -575,18 +575,18 @@ def nor_a_ab(a,c,min,max):
 		a_norm = np.log(1 + c * a)
 	else:
 		a_norm = a
-	minimum = min
+	minimum = math.log(1+c*min)
 	if (min == -1):
 		minimum = np.amin(a_norm, axis=(0, 1, 2))
-	maximum = max
+	maximum = math.log(1+c*max)
 	if (max == -1):
 		maximum = np.amax(a_norm, axis=(0, 1, 2))
 	for z_dim in range(a_norm.shape[3]):
 		a_norm[:,:,:,z_dim]= ( a_norm[:,:,:,z_dim] - minimum[z_dim] ) /\
 								( maximum[z_dim]-minimum[z_dim] )
-	#Debug
-	print(minimum)
-	print(maximum)
+	#
+	print("MIN: if (c>0) them log(1+c*min) else min: ", minimum)
+	print("MAX: if (c>0) them log(1+c*max) else max: ", maximum)
 	return a_norm
 def nor_g(g,c):
 	print("Normalizing g...")
@@ -616,42 +616,69 @@ def nor_g(g,c):
 	return norm_g
 def nor_y_ab(y,c,min,max):
 	# c = 0: normalization MIN-MAX
-	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+x)
+	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+c*x)
+	# min = -1: the minimum is computed
+	# max = -1: the maximum is computed
 	print("Normalizing y with AB approach...")
+	minimum = 0.0
+	maximum = 1.0
 	if (c > 0):
 		y_norm = np.log(1 + c * y)
 	else:
 		y_norm = y
-	minimum = min
 	if (min == -1):
 		minimum = np.amin(y_norm, axis=(0))
-	maximum = max
+	else:
+		if (c > 0):
+			minimum = math.log(1+c*min)
+		else:
+			minimum = min
+	
 	if (max == -1):
 		maximum = np.amax(y_norm, axis=(0))
+	else:
+		if (c > 0):
+			maximum = math.log(1+c*max)
+		else:
+			maximum = max
 	y_norm = ( y_norm - minimum ) / ( maximum - minimum )
+	# 
+	print("MIN: if (c>0) them log(1+c*min) else min: ", minimum)
+	print("MAX: if (c>0) them log(1+c*max) else max: ", maximum)
 	return y_norm
 #
 def nor_g_ab(g,c,min,max):
 	# c = 0: normalization MIN-MAX
-	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+x)
+	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+c*x)
+	# min = -1: the minimum is computed
+	# max = -1: the maximum is computed
 	print("Normalizing g with AB approach...")
-	print("Computing min,max...")
+	minimum = 0.0
+	maximum = 1.0
 	if (c > 0):
 		g_norm = np.log(1 + c * g)
 	else:
 		g_norm = g
-	minimum = min
 	if (min == -1):
 		minimum = np.amin(g_norm, axis=(0, 1, 2))
-	maximum = max
+	else:
+		if (c > 0):
+			minimum = math.log(1+c*min)
+		else:
+			minimum = min
 	if (max == -1):
 		maximum = np.amax(g_norm, axis=(0, 1, 2))
+	else:
+		if (c > 0):
+			maximum = math.log(1+c*max)
+		else:	
+			maximum = max
 	for z_dim in range(g_norm.shape[3]):
 		g_norm[:,:,:,z_dim]= ( g_norm[:,:,:,z_dim] - minimum[z_dim] ) /\
 							( maximum[z_dim] - minimum[z_dim] )
-	#Debug
-	print(minimum)
-	print(maximum)
+	#
+	print("MIN: if (c>0) them log(1+c*min) else min: ", minimum)
+	print("MAX: if (c>0) them log(1+c*max) else max: ", maximum)
 	return g_norm
 # TODO	
 def denor_g(g_nor, c, min, max):
