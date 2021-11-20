@@ -27,27 +27,10 @@ def run_model():
 	return x, y, X_train, X_test, y_train, y_test, model_rq, history
 
 def mape_error_zero (y, predict):
-	delta_zero = 0.0
-	zero = 0
-	non_zero = 0
-	delta = 0.0
-	p = 0
-	for i in range(y.shape[0]):
-		if (y[i] == 0.0):
-			zero += 1
-			delta_zero += predict[i]
-			if (zero < 50):
-				print(y[i], predict[i])
-		else:
-			non_zero += 1
-			delta += abs(y[i] - predict[i])/y[i]
-			if (p < 50 and abs(y[i] - predict[i])/y[i] > 50):
-				print(y[i], predict[i])
-				p += 1
-	return delta/non_zero, non_zero, delta_zero/zero, zero
+	zeros = predict[y == 0.0]
+	y_not_zero_idx = y != 0.0
+	deltas = abs(y[y_not_zero_idx] - predict[y_not_zero_idx])/y[y_not_zero_idx]
+	return np.mean(deltas), deltas.shape[0], np.mean(zeros), zeros.shape[0]
+
 def zero_one (y):
-	y_zero_one = np.zeros((y.shape[0]))
-	for i in range(y.shape[0]):
-		if (y[i] > 0.0):
-			y_zero_one[i] = 1
-	return y_zero_one
+	return (y > 0.0)*1
