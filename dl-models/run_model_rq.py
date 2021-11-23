@@ -79,3 +79,9 @@ def run_models(x: np.ndarray, y: np.ndarray):
 			model_rq.fit(x_train, y_train_log, batch_size=256, epochs=50, shuffle=True, validation_data=(x_test, y_test_log))
 			predict = model_rq.predict(x_test)
 			print(F"Errors: {mape_error_zero(y_test_log, predict, c)}")
+
+
+if __name__ == "__main__":
+	x = np.load("x_100000_rq.npy")
+	y = np.load("y_100000_rq.npy")
+	run_models(x,y)
