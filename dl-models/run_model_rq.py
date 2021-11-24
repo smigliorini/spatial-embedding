@@ -7,6 +7,24 @@ import generate_input_RQ as gt
 import myModel_RQ_selectivity as m
 from sklearn.model_selection import train_test_split
 
+def load_and_run_model(file_x, file_y):
+	x = np.load(file_x)
+	y = np.load(file_y)
+	y_nor = rq.gt.gh.nor_y_ab(y) 
+
+	model_rq = m.RQ_sel_2Input_DENSE2L_DENSE1L(32,32,3,2,16,32,64)
+	model_rq.compile(optimizer='adam', loss=losses.MeanSquaredError())
+	print("Splitting training and test set...")
+	X_train_full, X_test, y_train_full, y_test = train_test_split(x, y, test_size=0.2)
+	X_train, X_valid, y_train, y_valid = train_test_split(X_train_full, y_train_full)
+	X_loc_train = X_train[:,:,:,0:3]
+	X_loc_valid = X_valid[:,:,:,0:3]
+	X_loc_test = X_test[:,:,:,0:3]
+	X_glo_train = X_train[:,:,:,3:7]
+	X_glo_valid = X_valid[:,:,:,3:7]
+	X_glo_test = X_test[:,:,:,3:7]
+	history = model_rq.fit([X_loc_train, X_glo_train], [y_train, y_train], epochs=20, batch_size=8, shuffle=True, validation_data=([X_loc_valid, X_glo_valid], [y_valid, y_valid])
+	
 def run_model():
 	local_enc = keras.models.load_model('model/model_3072_CNNDense_newDatasets_SMLG')
 	global_enc = keras.models.load_model('model/model_2048_CNNDense_newDatasets_SMLG_global_new')
