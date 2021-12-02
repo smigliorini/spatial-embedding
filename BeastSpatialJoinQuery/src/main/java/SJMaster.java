@@ -92,8 +92,8 @@ public class SJMaster {
     public void run(String path, boolean safe, boolean[] algorithmsToUse){
 
         int totalNumCouple = (datasets1.size());
-        BeastOptions beastOptions = new BeastOptions().set("separator", ',');
-        String format = "envelope(0,1,2,3)";
+        BeastOptions beastOptions = new BeastOptions();//.set("separator", ',');
+        String format = "wkt";
         for (int i = 0; i < totalNumCouple ; i++){
             System.err.println("INFO: Working on the couple n° " + (i+1) +" of " + totalNumCouple+".");
 
