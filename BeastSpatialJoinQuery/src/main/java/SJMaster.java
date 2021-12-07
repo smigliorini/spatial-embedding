@@ -129,12 +129,16 @@ public class SJMaster {
             results.addEntry(datasets1.get(i) + "," + datasets2.get(i),
                     executeSJ(algorithmsToUse));
             if(safe){
+                System.out.println("INFO: Saving the results. Don't kill the process now.");
                 results.toCsv(path);
                 results.toJson(path);
+                System.out.println("INFO: Results saved.");
             }
         }
+        System.out.println("INFO: Saving the results. Don't kill the process now.");
         results.toCsv(path);
         results.toJson(path);
+        System.out.println("INFO: Results saved.");
     }
 
     /**
