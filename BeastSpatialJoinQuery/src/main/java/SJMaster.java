@@ -16,6 +16,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Date;
 
 /**
  * Execute the spatial joins between the datsets and estract form the logs the statistical information needed.
@@ -260,10 +261,12 @@ public class SJMaster {
         Pattern pattern = Pattern.compile("(?<=took )\\d*.\\d*");
         Matcher matcher = pattern.matcher(execOutput);
         ArrayList<Double> runningTimes = new ArrayList<>();
-
         while(matcher.find()){
             runningTimes.add(Double.valueOf(matcher.group(0)));
         }
+
+        if (runningTimes.size() == 0)
+            errorRetrievingInfo(pattern.pattern(), execOutput);
         return runningTimes;
     }
 
@@ -285,6 +288,11 @@ public class SJMaster {
             long op_size = Long.parseLong(matcher1.group(0)) * Long.parseLong(matcher2.group(0));
             sizeJoins.add(op_size);
         }
+
+        if (sizeJoins.size() == 0)
+            errorRetrievingInfo("First regex: "+pattern1.pattern()+
+                    "\nSecond regex: "+pattern2.pattern(), execOutput);
+
         return sizeJoins;
     }
 
@@ -325,4 +333,32 @@ public class SJMaster {
         deviation = Math.sqrt(deviation);
         return deviation/mean;
     }
+
+    private void errorRetrievingInfo(String pattern, String execOutput){
+        System.out.println("ERROR: An error occurred while trying to retrieve info with the regex:");
+        System.out.println(pattern);
+        long name = new Date().getTime();
+        System.out.println("The text that couldn't be parsed with the regex can be found in the file "+name+".txt");
+
+        FileWriter file = null;
+        BufferedWriter buffer = null;
+        try {
+            file = new FileWriter(name+".txt");
+            buffer = new BufferedWriter(file);
+            buffer.write(execOutput);
+        } catch (IOException e) {
+            System.out.println("ERROR: An error occurred.");
+            System.out.println(e.toString());
+        } finally {
+            try {
+                assert buffer != null;
+                buffer.close();
+                file.close();
+            } catch (IOException e) {
+                System.out.println("ERROR: An error occurred.");
+                System.out.println(e.toString());
+            }
+        }
+    }
+
 }
