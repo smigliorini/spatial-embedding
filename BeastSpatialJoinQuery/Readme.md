@@ -13,6 +13,19 @@ errors at run time
 * `-d,--dj` Execute the spatial joins using the DJ algorithm
 * `-r,--repj `Execute the spatial joins using the REPJ algorithm
 
+### Resume
+If in the output folder is present one or more results, the software will ask the suer if he wants to resume from the
+last one. If the user accepts, then the software will skip all the couple already executed and will continue with the
+remaining ones.
+
+### Example
+```bash
+beast --class SpatialJoin  target/BeastSpatialJoinQuery-1.0.jar --input dataset_couple.csv --output sj_results -s -d
+```
+In this case the software will execute the joins using only the DJ algorithm on the couple of datasets specified in 
+the file `dataset_couple.csv` and will save the results after every join in the folder `sj_results`.
+
+
 ## Input file
 The program will expect to find inside a TXT file a list of the couple of datasets to be used both in their partitioned 
 and non-partitioned version. An example of the file is reported below.

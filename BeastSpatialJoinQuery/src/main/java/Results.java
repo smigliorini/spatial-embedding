@@ -6,6 +6,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Set;
 
 public class Results {
     private final HashMap<String,SJResult> resultsMap;
@@ -18,7 +19,9 @@ public class Results {
     public void addEntry(String files, SJResult sjResult){
         resultsMap.put(files,sjResult);
     }
-
+    public Set<String> getDatasetCouples(){
+        return resultsMap.keySet();
+    }
     public void toJson(String path){
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         FileWriter myWriter = null;
@@ -27,14 +30,15 @@ public class Results {
             myWriter.write(gson.toJson(this));
             myWriter.close();
         } catch (IOException e) {
-            System.err.println("An error occurred.");
-            e.printStackTrace();
+            System.out.println("An error occurred.");
+            System.out.println(e.toString());
         }finally {
             try {
                 assert myWriter != null;
                 myWriter.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                System.out.println("An error occurred.");
+                System.out.println(e.toString());
             }
         }
     }
@@ -76,14 +80,16 @@ public class Results {
                 buffer.newLine();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("An error occurred.");
+            System.out.println(e.toString());
         } finally {
             try {
                 assert buffer != null;
                 buffer.close();
                 file.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                System.out.println("An error occurred.");
+                System.out.println(e.toString());
             }
         }
     }

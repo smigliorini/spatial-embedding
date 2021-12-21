@@ -1,5 +1,9 @@
 import org.apache.commons.cli.*;
 import java.io.*;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Scanner;
+
 
 public class SpatialJoin {
     public static void main(String[] args) {
@@ -14,7 +18,6 @@ public class SpatialJoin {
         options.addOption("h", "help", false, "Print this message");
         options.addOption("i", "input", true, "Specify the file containing the list of datasets to use for the spatial join");
         options.addOption("o", "output", true, "Specify the directory that will contain the files with the statistical information regarding the spatial join executions");
-
         HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd = null;
         try {
@@ -30,18 +33,42 @@ public class SpatialJoin {
 
         File f = new File("/tmp/spark-events");
         if (f.mkdir())
-            System.err.println("Folder /tmp/spark-events has been created to store the logs of Spark");
+            System.out.println("Folder /tmp/spark-events has been created to store the logs of Spark");
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream(1000000);
-        System.setOut(new PrintStream(baos));
+        System.setErr(new PrintStream(baos));
         assert cmd != null;
 
         if( ! new File(cmd.getOptionValue("output", ".")).exists()){
-            System.err.println("ERROR:The folder "+cmd.getOptionValue("output", ".")+"/ does not exists.\n" +
+            System.out.println("ERROR:The folder "+cmd.getOptionValue("output", ".")+"/ does not exists.\n" +
                     "The execution will be terminated now");
             System.exit(1);
         }
 
+        /*
+         Check if previous results are present and ask if the user want to resume
+         */
+        File folder = new File(cmd.getOptionValue("output", "."));
+        File [] files = folder.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                return name.endsWith(".json");
+            }
+        });
+        File last = null;
+        if (files != null){
+            Arrays.sort(files);
+            last = files[files.length-1];
+            System.out.printf("I found this previous execution:\n%s\nDo you want to resume it? y/n ",last.getName());
+            Scanner reader = new Scanner(System.in);
+            last = reader.nextLine().toLowerCase().contains("y") ? last : null;
+        }
+
+        if (last != null){
+            System.out.println("The previous results will be loaded");
+        }else{
+            System.out.println("The execution will start from scratch");
+        }
 
         SJMaster sjMaster = null;
         try {
@@ -50,9 +77,13 @@ public class SpatialJoin {
             System.err.println("ERROR: Cannot find " + cmd.getOptionValue("input", "datasets.txt")+".\nThe execution will be terminated now");
             System.exit(1);
         }catch (IOException e){
-            e.printStackTrace();
-            System.err.println("ERROR: The execution will be terminated now");
+            System.out.println(e.toString());
+            System.out.println("ERROR: The execution will be terminated now");
             System.exit(1);
+        }
+
+        if(last != null){
+            sjMaster.resume(last.getAbsolutePath());
         }
 
         boolean[] algorithmToUse;
@@ -63,6 +94,8 @@ public class SpatialJoin {
 
         sjMaster.run(cmd.getOptionValue("output", "."),cmd.hasOption("s"),algorithmToUse);
         sjMaster.stop();
+
+        System.exit(0);
 
     }
 

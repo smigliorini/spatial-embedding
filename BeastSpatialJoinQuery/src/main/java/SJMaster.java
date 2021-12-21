@@ -1,3 +1,4 @@
+import com.google.gson.Gson;
 import edu.ucr.cs.bdlab.beast.cg.SpatialJoinAlgorithms;
 import edu.ucr.cs.bdlab.beast.common.BeastOptions;
 import edu.ucr.cs.bdlab.beast.geolite.IFeature;
@@ -24,7 +25,7 @@ public class SJMaster {
     private final ArrayList<String> datasets_grid1;
     private final ArrayList<String> datasets2;
     private final ArrayList<String> datasets_grid2;
-    private final Results results ;
+    private Results results ;
     private final SparkSession sparkSession;
     private final JavaSparkContext sparkContext;
     private final ByteArrayOutputStream baos;
@@ -75,6 +76,29 @@ public class SJMaster {
         results = new Results();
     }
 
+    public void resume(String partialResultsPath){
+        Gson gson = new Gson(); // Or use new GsonBuilder().create();
+        try {
+            this.results = gson.fromJson(new FileReader(partialResultsPath), Results.class);
+        } catch (FileNotFoundException e) {
+            System.out.println(e.toString());
+        }
+
+        int initialNofDatasets = datasets1.size();
+        for(String datasetCouple : results.getDatasetCouples()) {
+            for (int i = 0; i < datasets1.size(); i++) {
+                if (datasetCouple.equals(datasets1.get(i) + "," + datasets2.get(i)) ) {
+                    datasets1.remove(i);
+                    datasets2.remove(i);
+                    datasets_grid1.remove(i);
+                    datasets_grid2.remove(i);
+                }
+            }
+        }
+        System.out.println("INFO: "+ (initialNofDatasets - datasets1.size())+" couple of datasets has been found in the " +
+                "saved results and their execution will be skipped");
+    }
+
     /**
      *  Return the results of the executions of the spatial joins
      */
@@ -92,10 +116,10 @@ public class SJMaster {
     public void run(String path, boolean safe, boolean[] algorithmsToUse){
 
         int totalNumCouple = (datasets1.size());
-        BeastOptions beastOptions = new BeastOptions().set("separator", ',');
-        String format = "envelope(0,1,2,3)";
+        BeastOptions beastOptions = new BeastOptions();//.set("separator", ',');
+        String format = "wkt";
         for (int i = 0; i < totalNumCouple ; i++){
-            System.err.println("INFO: Working on the couple n° " + (i+1) +" of " + totalNumCouple+".");
+            System.out.println("INFO: Working on the couple n° " + (i+1) +" of " + totalNumCouple+".");
 
             envelope1 = SpatialReader.readInput(sparkContext, beastOptions, datasets1.get(i), format);
             envelope1_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid1.get(i), format);
@@ -105,12 +129,16 @@ public class SJMaster {
             results.addEntry(datasets1.get(i) + "," + datasets2.get(i),
                     executeSJ(algorithmsToUse));
             if(safe){
+                System.out.println("INFO: Saving the results. Don't kill the process now.");
                 results.toCsv(path);
                 results.toJson(path);
+                System.out.println("INFO: Results saved.");
             }
         }
+        System.out.println("INFO: Saving the results. Don't kill the process now.");
         results.toCsv(path);
         results.toJson(path);
+        System.out.println("INFO: Results saved.");
     }
 
     /**
@@ -128,11 +156,11 @@ public class SJMaster {
     private SJResult executeSJ(boolean[] algorithmsToUse) {
         SJResult singleResults = new SJResult();
         SpatialJoinAlgorithms.ESJPredicate intersects = SpatialJoinAlgorithms.ESJPredicate.Intersects;
+        singleResults.setDataset2Size(envelope2.count());
+        singleResults.setDataset1Size(envelope1.count());
+        singleResults.setDataset1GridNPartitions(envelope1_par.getNumPartitions());
+        singleResults.setDataset2GridNPartitions(envelope2_par.getNumPartitions());
         try {
-            singleResults.setDataset2Size(envelope2.count());
-            singleResults.setDataset1Size(envelope1.count());
-            singleResults.setDataset1GridNPartitions(envelope1_par.getNumPartitions());
-            singleResults.setDataset2GridNPartitions(envelope2_par.getNumPartitions());
             baos.reset();
             if(algorithmsToUse[0])
                 executeBNLJ(singleResults,intersects);
@@ -144,13 +172,14 @@ public class SJMaster {
                 executeREPJ(singleResults,intersects);
 
         }catch (Exception e){
-            e.printStackTrace();
+            System.out.println("An error occurred.");
+            System.out.println(e.toString());
         }
         return singleResults;
     }
 
     private void executeBNLJ(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
-        System.err.println("INFO:\tExecuting BNLJ...");
+        System.out.println("INFO:\tExecuting BNLJ...");
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
         RDD<Tuple2<IFeature, IFeature>> sjResults;
@@ -162,7 +191,7 @@ public class SJMaster {
     }
 
     private void executePBSM(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
-        System.err.println("INFO:\tExecuting PBSM...");
+        System.out.println("INFO:\tExecuting PBSM...");
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
         RDD<Tuple2<IFeature, IFeature>> sjResults;
@@ -173,7 +202,7 @@ public class SJMaster {
         baos.reset();
     }
     private void executeDJ(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
-        System.err.println("INFO:\tExecuting DJ...");
+        System.out.println("INFO:\tExecuting DJ...");
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
         RDD<Tuple2<IFeature, IFeature>> sjResults;
@@ -184,7 +213,7 @@ public class SJMaster {
         baos.reset();
     }
     private void executeREPJ(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
-        System.err.println("INFO:\tExecuting REPJ...");
+        System.out.println("INFO:\tExecuting REPJ...");
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
         RDD<Tuple2<IFeature, IFeature>> sjResults;
@@ -246,7 +275,7 @@ public class SJMaster {
      * @return An array containing the join sizes.
      */
     private ArrayList<Long> extractSizeJoins(String execOutput) {
-        Pattern pattern1 = Pattern.compile("(?<=SpatialJoin  - Joining )\\d*");
+        Pattern pattern1 = Pattern.compile("(?<=SpatialJoin: Joining )\\d*");
         Matcher matcher1 = pattern1.matcher(execOutput);
         Pattern pattern2 = Pattern.compile("(?<= x )\\d*(?= records)");
         Matcher matcher2 = pattern2.matcher(execOutput);

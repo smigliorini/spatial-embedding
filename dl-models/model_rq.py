@@ -13,12 +13,12 @@ import myModel_RQ_selectivity as mm
 # Model creating...
 def create_model_RQ_sel(dimx,dimy,dimz):
 	print("Inizilizing Autoencoder DENSE local...")
-	m_rq_sel = RQ_sel_DENSE(dimx,dimy,dimz,1024)
+	m_rq_sel = mm.RQ_sel_DENSE(dimx,dimy,dimz,1024)
 	m_rq_sel.compile(optimizer='adam', loss=losses.MeanSquaredError())
 	return m_rq_sel
 
 # Model training...
-def train_model_RQ_sel(mod, X, y)
+def train_model_RQ_sel(mod, X, y):
 	print('Data points: ',X.shape)
 	# splitting train and test 0.2
 	print("Splitting training and test set...")

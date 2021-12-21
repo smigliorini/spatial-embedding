@@ -20,6 +20,7 @@ import edu.ucr.cs.bdlab.beast.geolite.EnvelopeNDLite
 import edu.ucr.cs.bdlab.beast.indexing.RSGrovePartitioner
 import edu.ucr.cs.bdlab.beast.io.{CSVFeatureWriter, SpatialWriter}
 import edu.ucr.cs.bdlab.beast.operations.GriddedSummary
+import edu.ucr.cs.bdlab.beast.synopses.BoxCounting
 import edu.ucr.cs.bdlab.beast.{SpatialRDD, _}
 import edu.ucr.cs.bdlab.davinci.SingleLevelPlot
 import org.apache.commons.cli.{BasicParser, HelpFormatter, Options}
@@ -82,10 +83,10 @@ object GenerateRandomData {
     val datasetsPath = new Path(outPath, commandline.getOptionValue("datasets", "datasets"))
     val summariesPath = new Path(outPath, commandline.getOptionValue("summaries", "summaries"))
     val imagePath = new Path(outPath, commandline.getOptionValue("images", "images"))
-    val summaryOutput: PrintStream = if (!commandline.hasOption("global-summary")) null else {
+    val globalSummaryOutput: PrintStream = if (!commandline.hasOption("global-summary")) null else {
       val globalSummaryPath = new Path(outPath, commandline.getOptionValue("global-summary"))
-      val out = new PrintStream(filesystem.create(globalSummaryPath))
-      out.println("dataset,x1,y1,x2,y2,num_features,size,num_points,avg_area,avg_side_length_0,avg_side_length_1")
+      val out = new PrintStream(globalSummaryPath.getFileSystem(sc.hadoopConfiguration).create(globalSummaryPath))
+      out.println("dataset,distribution,x1,y1,x2,y2,num_features,size,num_points,avg_area,avg_side_length_0,avg_side_length_1,E0,E2")
       out
     }
     val queriesInput = commandline.getOptionValue("queries-input")
@@ -119,7 +120,8 @@ object GenerateRandomData {
       val datasetsBeingGenerated = new collection.mutable.ArrayBuffer[Future[Int]]()
       val parallelism = commandline.getOptionValue("parallelism", "32").toInt
 
-      outPath.getFileSystem(sc.hadoopConfiguration).mkdirs(outPath)
+      if (!outPath.toString.startsWith("/dev/null"))
+        outPath.getFileSystem(sc.hadoopConfiguration).mkdirs(outPath)
 
       while (datasetsToGenerate.nonEmpty || datasetsBeingGenerated.nonEmpty) {
         // Check if any jobs are done
@@ -171,12 +173,25 @@ object GenerateRandomData {
               dataset.summary
             }
 
-            if (summaryOutput != null) summaryOutput.synchronized {
-              summaryOutput.println(s"${datasetName},${globalSummary.getMinCoord(0)},${globalSummary.getMinCoord(1)}," +
-                s"${globalSummary.getMaxCoord(0)},${globalSummary.getMaxCoord(1)}," +
-                s"${globalSummary.numFeatures},${globalSummary.size}," +
-                s"${globalSummary.numPoints},${globalSummary.averageSideLength(0)},${globalSummary.averageSideLength(1)}," +
-                s"${globalSummary.averageArea}")
+            if (globalSummaryOutput != null) {
+              // Compute box counting summaries (E0, E2)
+              val bcHistogram = BoxCounting.computeBCHistogram(dataset, 128, globalSummary)
+              val e0 = BoxCounting.boxCounting(bcHistogram, 0)
+              val e2 = BoxCounting.boxCounting(bcHistogram, 2)
+              val distribution: DistributionType = if (i <= 1000) UniformDistribution
+              else if (i <= 1200) DiagonalDistribution
+              else if (i <= 1400) GaussianDistribution
+              else if (i <= 1600) ParcelDistribution
+              else if (i <= 1800) BitDistribution
+              else if (i <= 2000) SierpinskiDistribution
+              else null
+              globalSummaryOutput.synchronized {
+                globalSummaryOutput.println(s"${datasetName},${distribution},${globalSummary.getMinCoord(0)},${globalSummary.getMinCoord(1)}," +
+                  s"${globalSummary.getMaxCoord(0)},${globalSummary.getMaxCoord(1)}," +
+                  s"${globalSummary.numFeatures},${globalSummary.size}," +
+                  s"${globalSummary.numPoints},${globalSummary.averageSideLength(0)},${globalSummary.averageSideLength(1)}," +
+                  s"${globalSummary.averageArea},${e0},${e2}")
+              }
             }
 
             // 3- Draw an image of it
@@ -226,8 +241,8 @@ object GenerateRandomData {
       spark.stop()
       if (queriesOutput != null)
         queriesOutput.close()
-      if (summaryOutput != null)
-        summaryOutput.close()
+      if (globalSummaryOutput != null)
+        globalSummaryOutput.close()
     }
 
   }
