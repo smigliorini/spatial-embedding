@@ -15,11 +15,11 @@ def load_and_run_model(file_x, file_y):
 	#	if (y[i] > 0.0):
 	#		y[i] += 0.2
 	maximum = np.amax(y, axis=(0))
-	y_nor = gt.gh.nor_y_ab(y,100,0.0,maximum)
+	y_nor = gt.gh.nor_y_ab(y,1000,0.0,maximum)
 	freq = gt.gh.count_frequency_1(y_nor)
 	p.plot_freq(freq)
 
-	model_rq = m.RQ_sel_2Input_CNN2L_CNN2L_noBN_DENSE2L(32,32,3072,1024,3072,1024)
+	model_rq = m.RQ_sel_2Input_CNN2L_CNN1L_noBN_DENSE2L(32,32,3072,1024,3072,1024)
 	#model_rq = m.RQ_sel_2Input_DENSE3L_DENSE2L(32,32,2048,1024,2048,1024,256)
 	model_rq.compile(optimizer='adam', loss=losses.MeanSquaredError())
 	#model_rq.compile(optimizer='adam', loss=losses.MeanAbsolutePercentageError())

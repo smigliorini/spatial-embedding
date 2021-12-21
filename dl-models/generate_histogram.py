@@ -672,7 +672,7 @@ def nor_g_ab(hist,c,min,max):
 	return hist
 #
 def denorm_y_ab(y_nor, c, min, max):
-	print("DeNoromalizing y..	.")
+	print("Denormalizing y..")
 	min_log = math.log(1+c*min)
 	max_log = math.log(1+c*max)
 	delta = max_log - min_log
