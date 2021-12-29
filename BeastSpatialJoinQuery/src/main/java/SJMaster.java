@@ -14,6 +14,7 @@ import scala.Tuple2;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Date;
@@ -184,10 +185,12 @@ public class SJMaster {
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
         RDD<Tuple2<IFeature, IFeature>> sjResults;
+
+        long start = System.currentTimeMillis();
         sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), esjPredicate,
                 SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ, mbr, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
-        singleResults.addJoinResult(JoinAlgorithms.BNLJ, extractSingleSJ(baos.toString(), mbr.count()));
+        singleResults.addJoinResult(JoinAlgorithms.BNLJ, extractSingleSJ(start, mbr.count()));
         baos.reset();
     }
 
@@ -196,10 +199,12 @@ public class SJMaster {
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
         RDD<Tuple2<IFeature, IFeature>> sjResults;
+
+        long start = System.currentTimeMillis();
         sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), esjPredicate,
                 SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM, mbr, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
-        singleResults.addJoinResult(JoinAlgorithms.PBSM, extractSingleSJ(baos.toString(), mbr.count()));
+        singleResults.addJoinResult(JoinAlgorithms.PBSM, extractSingleSJ(start, mbr.count()));
         baos.reset();
     }
     private void executeDJ(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
@@ -207,10 +212,12 @@ public class SJMaster {
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
         RDD<Tuple2<IFeature, IFeature>> sjResults;
+
+        long start = System.currentTimeMillis();
         sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2_par.rdd(), esjPredicate,
                 SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ, mbr, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
-        singleResults.addJoinResult(JoinAlgorithms.DJ, extractSingleSJ(baos.toString(), mbr.count()));
+        singleResults.addJoinResult(JoinAlgorithms.DJ, extractSingleSJ(start, mbr.count()));
         baos.reset();
     }
     private void executeREPJ(SJResult singleResults, SpatialJoinAlgorithms.ESJPredicate esjPredicate){
@@ -218,6 +225,8 @@ public class SJMaster {
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
         RDD<Tuple2<IFeature, IFeature>> sjResults;
+
+        long start = System.currentTimeMillis();
         if (envelope1.count() > envelope2.count()) {
             baos.reset();
             sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2.rdd(), esjPredicate,
@@ -228,27 +237,25 @@ public class SJMaster {
                     SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
         }
         singleResults.setResultSJSize(sjResults.count());
-        singleResults.addJoinResult(JoinAlgorithms.REPJ, extractSingleSJ(baos.toString(), mbr.count()));
+        singleResults.addJoinResult(JoinAlgorithms.REPJ, extractSingleSJ(start, mbr.count()));
         baos.reset();
     }
 
-
     /**
      * Extracts from the log of the execution the information relative to the execution of a single SJ
-     * @param execOutput the log of the execution of the spatial join
+     * @param startTime the start time of the join expressed in milliseconds
      * @param count the number of MBR test
      * @return the information relative to the execution of a single SJ
      */
-    private AlgorithmResult extractSingleSJ(String execOutput,long count){
+    private AlgorithmResult extractSingleSJ(long startTime,long count){
+        long timeElapsed = System.currentTimeMillis() - startTime;
         AlgorithmResult algorithmResult = new AlgorithmResult();
         algorithmResult.setMBRTests(count);
-        ArrayList<Double> jobsTime = extractRunningTimes(execOutput);
-        algorithmResult.setJobsTimes(jobsTime);
-        algorithmResult.setJobsTimesRelStdDev(RSDTimes(jobsTime));
+        algorithmResult.setJobsTimes(new ArrayList<>(Arrays.asList(timeElapsed/1000.0) ) );
+        algorithmResult.setJobsTimesRelStdDev(0.0);
 
-        ArrayList<Long> sizeJoins = extractSizeJoins(execOutput);
-        algorithmResult.setSizeJoins(sizeJoins);
-        algorithmResult.setSizeJoinsRelStdDev(RSDSizeJoins(sizeJoins));
+        algorithmResult.setSizeJoins(new ArrayList<>(Arrays.asList(0L) ) );
+        algorithmResult.setSizeJoinsRelStdDev(0);
         return  algorithmResult;
     }
 

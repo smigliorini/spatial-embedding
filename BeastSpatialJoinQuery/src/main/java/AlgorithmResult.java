@@ -1,5 +1,8 @@
 import java.util.ArrayList;
 
+/**
+ * Java object that contains n° of mbr tests, the times of the jobs and the sizes of the joins of a single SpatialJoin.
+ */
 public class AlgorithmResult {
     public long MBRTests;
     public ArrayList<Double> jobsTimes;

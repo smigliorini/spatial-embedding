@@ -36,7 +36,7 @@ public class SpatialJoin {
             System.out.println("Folder /tmp/spark-events has been created to store the logs of Spark");
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream(1000000);
-        System.setErr(new PrintStream(baos));
+        //System.setErr(new PrintStream(baos));
         assert cmd != null;
 
         if( ! new File(cmd.getOptionValue("output", ".")).exists()){
@@ -56,7 +56,7 @@ public class SpatialJoin {
             }
         });
         File last = null;
-        if (files != null){
+        if (files != null && files.length > 0){
             Arrays.sort(files);
             last = files[files.length-1];
             System.out.printf("I found this previous execution:\n%s\nDo you want to resume it? y/n ",last.getName());

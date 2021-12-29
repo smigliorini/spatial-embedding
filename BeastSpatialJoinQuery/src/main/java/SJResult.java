@@ -1,6 +1,9 @@
 import java.util.HashMap;
 
 enum JoinAlgorithms{BNLJ,PBSM,DJ,REPJ}
+/*
+* It contains the information of the execution of a SpatialJoin with different algorithms.
+ */
 public class SJResult {
 
 
