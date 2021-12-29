@@ -25,8 +25,8 @@ DIM_EG_Z = 2
 NORM_MIN = [0. ,0. ,0. ,0. ,0. ,0.]
 NORM_MAX = [8.77805800e+06, 3.05404802e+09, 1.53571255e+08, 3.03019291e-02, 1.91233400e-01, 2.20753674e-01]
 
-NORM_MIN_G = [0.0]
-NORM_MAX_G = [8708693.144550692]
+NORM_MIN_G = 0.0
+NORM_MAX_G = 8708693.144550692
 
 X_MIN_REF = 0
 X_MAX_REF = 10
@@ -38,12 +38,12 @@ Y_MAX_REF = 10
 def get_embedding(local_enc, global_enc, rq_hist, datasetFile, mbr):
     # get local histogram
     hist_local = gh.gen_hist_from_file(DIM_H_X,DIM_H_Y,DIM_H_Z,datasetFile)
-    hist_local_norm = gh.nor_a_ab(hist_local.reshape((1,DIM_H_X,DIM_H_Y,DIM_H_Z)), 1, NORM_MIN, NORM_MAX)
+    hist_local_norm = gh.nor_g_ab(hist_local.reshape((1,DIM_H_X,DIM_H_Y,DIM_H_Z)), 1, NORM_MIN, NORM_MAX)
     emb_local = local_enc.encoder(hist_local_norm.reshape((1,DIM_H_X,DIM_H_Y,DIM_H_Z)))
 
     # computing global histogram
     hist_glob = gh.gen_global_hist(hist_local, DIM_H_X, DIM_H_Y, mbr)
-    hist_glob_norm = gh.nor_g_ab(hist_glob.reshape((1,DIM_H_X,DIM_H_Y,DIM_HG_Z)), 1, NORM_MIN_G, NORM_MAX_G)
+    hist_glob_norm = gh.nor_g_ab(hist_glob.reshape((1,DIM_H_X,DIM_H_Y)), 1, NORM_MIN_G, NORM_MAX_G)
     emb_global = global_enc.encoder(hist_glob_norm.reshape((1,DIM_H_X,DIM_H_Y,DIM_HG_Z)))
 
     # computing embedding of rq_histogram
@@ -114,6 +114,7 @@ def gen_rq_input_from_file(local_enc, global_enc, rqFile, mbrFile, resultFile, c
                 line_count += 1
         out_x = np.zeros((line_count,DIM_E_X,DIM_E_Y,(DIM_E_Z + 2*DIM_EG_Z)))
         out_y = np.zeros((line_count))
+        #out_hist = np.zeros((line_count,DIM_H_X,DIM_H_Y))
         with open(resultFile, mode='r') as csv_file:
             csv_reader = csv.DictReader(csv_file,delimiter=delim)
             line_count = 0
@@ -137,6 +138,7 @@ def gen_rq_input_from_file(local_enc, global_enc, rqFile, mbrFile, resultFile, c
                 x = np.concatenate([embL, embG, embRQ], axis=2)
 
                 out_x[line_count] = x
+                #out_hist[line_count] = hglo
 
                 c = card[row["dataset"]]
                 out_y[line_count] = float(row["cardinality"]) / c["numFeatures"]
