@@ -8,18 +8,50 @@ import myModel_RQ_selectivity as m
 from sklearn.model_selection import train_test_split
 import plot as p
 
-def load_and_run_model(file_x, file_y):
+def results(hh, a_mape, a_mae_zero, mean_test, mean_pred, std_test, std_pred):
+	for i in range(a_mape.shape[0]):
+		last = len(hh[i].history["loss"])-1
+		print("loss[",i,"]: ",hh[i].history["loss"][last]," - val_loss[",i,"]: ",hh[i].history["val_loss"][last])
+	for i in range(a_mape.shape[0]):
+		print("MAPE[",i,"]:", a_mape[i])
+	for i in range(a_mae_zero.shape[0]):
+		print("MAE_ZERO[",i,"]:", a_mae_zero[i])
+	for i in range(mean_test.shape[0]):
+		print("mean_test[",i,"]:", mean_test[i], "(",std_test[i],") - mean_pred[",i,"]:", mean_pred[i], "(", std_pred[i],")")
+
+def run_moretimes(file_x, file_y, times, start):
+	hh = np.zeros((times,), dtype=dict)
+	a_mape = np.zeros((times,), dtype=float)
+	a_mae_zero = np.zeros((times,), dtype=float)
+	mean_test = np.zeros((times,), dtype=float)
+	mean_pred = np.zeros((times,), dtype=float)
+	std_test = np.zeros((times,), dtype=float)
+	std_pred = np.zeros((times,), dtype=float)
+	f1 = start
+	for i in range(times):
+		m, y_test, y_pred, h, x_loc_test, x_glo_test, mape, mae_zero = load_and_run_model(file_x,file_y,f1, f1/2,f1/2,f1/4)
+		hh[i] = h
+		a_mape[i] = mape
+		a_mae_zero[i] = mae_zero
+		mean_test[i] = np.mean(y_test)
+		mean_pred[i] = np.mean(y_pred)
+		std_test[i] = np.std(y_test)
+		std_pred[i] = np.std(y_pred)
+		f1 = f1*2
+	return hh, a_mape, a_mae_zero, mean_test, mean_pred, std_test, std_pred
+
+def load_and_run_model(file_x, file_y, f1, f2, f3, f4):
 	x = np.load(file_x)
 	y = np.load(file_y)
 	#for i in range(y.shape[0]):
 	#	if (y[i] > 0.0):
 	#		y[i] += 0.2
 	maximum = np.amax(y, axis=(0))
-	y_nor = gt.gh.nor_y_ab(y,1000,0.0,maximum)
+	y_nor = gt.gh.nor_y_ab(y,200,0.0,maximum)
 	freq = gt.gh.count_frequency_1(y_nor)
 	p.plot_freq(freq)
 
-	model_rq = m.RQ_sel_2Input_CNN2L_CNN1L_noBN_DENSE2L(32,32,3072,1024,3072,1024)
+	model_rq = m.RQ_sel_2Input_CNN2L_CNN1L_noBN_DENSE2L(32,32,f1,f2,f3,f4)
 	#model_rq = m.RQ_sel_2Input_DENSE3L_DENSE2L(32,32,2048,1024,2048,1024,256)
 	model_rq.compile(optimizer='adam', loss=losses.MeanSquaredError())
 	#model_rq.compile(optimizer='adam', loss=losses.MeanAbsolutePercentageError())
@@ -45,7 +77,7 @@ callbacks=[callback], validation_data=([X_loc_valid, X_glo_valid], y_valid))
 	print ("MAE norm zero: ", mae_zero0, freq_zero0, num_zero0)
 
 	# Denormalized prediction
-	y_test_den = gt.gh.denorm_y_ab(y_test,100,0.0,maximum)
+	y_test_den = gt.gh.denorm_y_ab(y_test,200,0.0,maximum)
 	#for i in range(y_test_den.shape[0]):
 	#	if (y_test_den[i] > 0.0):
 	#		y_test_den[i] -= 0.2
@@ -53,7 +85,7 @@ callbacks=[callback], validation_data=([X_loc_valid, X_glo_valid], y_valid))
 	#		y_test_den[i] = 0.0
 	#y_test_den = gt.gh.denorm_y_ab(y_test_den,200,0.0,0.5)
 	#
-	y_pred_den = gt.gh.denorm_y_ab(y_pred,100,0.0,maximum)
+	y_pred_den = gt.gh.denorm_y_ab(y_pred,200,0.0,maximum)
 	#for i in range(y_pred_den.shape[0]):
 	#	if (y_pred_den[i] > 0.0):
 	#		y_pred_den[i] -= 0.2
@@ -66,7 +98,7 @@ callbacks=[callback], validation_data=([X_loc_valid, X_glo_valid], y_valid))
 	print ("MAPE denor non zero: ", mape, freq, num)
 	print ("MAE denor zero: ", mae_zero, freq_zero, num_zero)
 
-	return model_rq, y_test_den, y_pred_den, history, X_loc_test, X_glo_test
+	return model_rq, y_test_den, y_pred_den, history, X_loc_test, X_glo_test, mape, mae_zero
 
 def run_model():
 	local_enc = keras.models.load_model('model/model_3072_CNNDense_newDatasets_SMLG')
