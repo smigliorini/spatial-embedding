@@ -14,11 +14,11 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <beast.version>0.9.3-SNAPSHOT</beast.version>
+    <beast.version>0.9.4</beast.version>
     <spark.version>3.0.0</spark.version>
     <scala.version>2.12.10</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
-    <scala.maven.plugin.version>4.4.0</scala.maven.plugin.version>
+    <scala.maven.plugin.version>4.5.6</scala.maven.plugin.version>
   </properties>
 
   <dependencies>

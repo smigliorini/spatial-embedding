@@ -24,7 +24,7 @@ import edu.ucr.cs.bdlab.beast.synopses.BoxCounting
 import edu.ucr.cs.bdlab.beast.{SpatialRDD, _}
 import edu.ucr.cs.bdlab.davinci.SingleLevelPlot
 import org.apache.commons.cli.{BasicParser, HelpFormatter, Options}
-import org.apache.hadoop.fs.{Path, PathFilter}
+import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.locationtech.jts.geom.{Envelope, GeometryFactory}
@@ -152,6 +152,11 @@ object GenerateRandomData {
 
             // 2- Generate summary
             val summaryPath = new Path(summariesPath, datasetName + "_summary.csv")
+            val tempfs: FileSystem = summaryPath.getFileSystem(sc.hadoopConfiguration)
+            if (!tempfs.exists(summaryPath)) {
+              tempfs.mkdirs(summariesPath)
+            }
+
             val globalSummary = if (!summaryPath.toString.startsWith("/dev/null") && !filesystem.isFile(summaryPath)) {
               val tempSummaryPath = new Path(outPath, datasetName + "_summary_temp")
               val (globalSummary, localSummaries) = GriddedSummary.computeForFeatures(dataset, 128, 128)
@@ -166,7 +171,9 @@ object GenerateRandomData {
               val summaryFile = filesystem.listStatus(tempSummaryPath, new PathFilter {
                 override def accept(path: Path): Boolean = path.getName.startsWith("part")
               })
-              filesystem.rename(summaryFile.head.getPath, summaryPath)
+              if (!filesystem.rename(summaryFile.head.getPath, summaryPath)){
+                throw new RuntimeException(s"Could not move summary file ${summaryFile.head.getPath} to ${summaryPath}")
+              }
               filesystem.delete(tempSummaryPath, true)
               globalSummary
             } else {
@@ -241,8 +248,10 @@ object GenerateRandomData {
       spark.stop()
       if (queriesOutput != null)
         queriesOutput.close()
-      if (globalSummaryOutput != null)
+      if (globalSummaryOutput != null) {
+        globalSummaryOutput.flush()
         globalSummaryOutput.close()
+      }
     }
 
   }
