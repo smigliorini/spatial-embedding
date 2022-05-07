@@ -20,15 +20,15 @@ Y_MAX = 128
 
 SIZE = 128
 
-def count_frequency_1(a):
-	freq = np.zeros(11)
+def count_frequency_1(a,numClass,max):
+	freq = np.zeros(numClass+1)
 	for i in range(a.shape[0]):
 		if (a[i] == 0):
 			index = 0
 		else:
-			index = math.ceil(a[i]*10)
-		if (index >= 11):
-			index = 10
+			index = math.ceil(a[i]/max*numClass)
+		if (index >= numClass+1):
+			index = numClass
 		freq[index] += 1
 	return freq
 
@@ -100,11 +100,12 @@ def gen_hist_from_file(dimx,dimy,dimz,file):
 #
 # loading local histograms and generating global histograms
 #
-def gen_input_from_file(dimx,dimy,dimz,path,mbrFile, suffix):
+def gen_input_from_file(dimx,dimy,dimz,path,mbrFile,fieldName, suffix):
 #
 # path: directory where the files containing the histograms are located: for example histograms_small
 # mbrFile: the name of the file containing the MBR of the datasets the histograms refer to
-# suffix: the suffix that must to be added in order to obtain from the name of the file the name of the dataset: for example '_s'
+# fieldName: 0 names of Alberto's files, 1 names of Ahmed's files
+# suffix: the suffix that must be added in order to obtain from the name of the file the name of the dataset: for example '_s'
 #
 	# Reading MBR file
 	mbr = {}
@@ -114,9 +115,14 @@ def gen_input_from_file(dimx,dimy,dimz,path,mbrFile, suffix):
 		for row in csv_reader:
 			if (line_count == 0):
 				print(f'Column names are: {", ".join(row)}')
-			print(f'\t{row["datasetName"]},{row["Collection"]}: {row["minX"]}, {row["minY"]}, {row["maxX"]}, {row["maxY"]}.')
-			name = row["datasetName"]
-			mbr[name] = dict([('minx', float(row["minX"])), ('miny', float(row["minY"])), ('maxx', float(row["maxX"])), ('maxy', float(row["maxY"]))])
+			if (fieldName == 0):
+				print(f'\t{row["datasetName"]},{row["Collection"]}: {row["minX"]}, {row["minY"]}, {row["maxX"]}, {row["maxY"]}.')
+				name = row["datasetName"]
+				mbr[name] = dict([('minx', float(row["minX"])), ('miny', float(row["minY"])), ('maxx', float(row["maxX"])), ('maxy', float(row["maxY"]))])
+			elif (fieldName == 1):
+				print(f'\t{row["dataset"]},{row["distribution"]}: {row["x1"]}, {row["y1"]}, {row["x2"]}, {row["y2"]}.')
+				name = row["dataset"]
+				mbr[name] = dict([('minx', float(row["x1"])), ('miny', float(row["y1"])), ('maxx', float(row["x2"])), ('maxy', float(row["y2"]))])
 			line_count += 1
 
 	#rq = {}
@@ -173,17 +179,29 @@ def gen_global_hist(h0, dimx, dimy, mbr):
 			yC = mbr['miny'] + ysize * i
 			#print('Cell coord: (',xC,',',yC,',',xC+xsize,',',yC+ysize,')')
 			firstCellGcol = math.floor(xC / xsizeG)
+			if (firstCellGcol == -1):
+				firstCellGcol = 0
+			if (firstCellGcol < 0 or firstCellGcol >= X_MAX):
+				continue
 			firstCellGrow = math.floor(yC / ysizeG)
+			if (firstCellGrow == -1):
+				firstCellGrow = 0
+			if (firstCellGrow < 0 or firstCellGrow >= Y_MAX):
+				continue
 			#print('Global Cell coord: (',firstCellGrow,',',firstCellGcol,')')
 			#print('Cell intersection: ',area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGcol * xsizeG, firstCellGrow * ysizeG), (firstCellGcol * xsizeG + xsizeG, firstCellGrow * ysizeG + ysizeG)))
 			hg[firstCellGrow, firstCellGcol] += (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGcol * xsizeG, firstCellGrow * ysizeG), (firstCellGcol * xsizeG + xsizeG, firstCellGrow * ysizeG + ysizeG)) / cellArea)
 			#cell[3])
 
 			secondCellGcol = math.floor((xC + xsize) / xsizeG)
+			if (secondCellGcol >= X_MAX):
+				secondCellGcol = X_MAX - 1 
 			if secondCellGcol > firstCellGcol:
 				hg[firstCellGrow, secondCellGcol] += (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (secondCellGcol * xsizeG, firstCellGrow * ysizeG), (secondCellGcol * xsizeG + xsizeG, firstCellGrow * ysizeG + ysizeG)) / cellArea)
 			
 			secondCellGrow = math.floor((yC + ysize) / ysizeG)
+			if (secondCellGrow >= Y_MAX):
+				secondCellGrow = Y_MAX - 1
 			if secondCellGrow > firstCellGrow:
 				hg[secondCellGrow, firstCellGcol] += (cell[0] * area_intersection((xC, yC), (xC + xsize, yC + ysize), (firstCellGcol * xsizeG, secondCellGrow * ysizeG), (firstCellGcol * xsizeG + xsizeG, secondCellGrow * ysizeG + ysizeG)) / cellArea)
 
@@ -571,20 +589,22 @@ def nor_a_ab(a,c,min,max):
 	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+x)
 	print("Normalizing a with AB approach...")
 	print("Computing min,max...")
+	min = np.array(min)
+	max = np.array(max)
 	if (c > 0):
 		a_norm = np.log(1 + c * a)
+		minimum = np.log(1+c*min)
+		maximum = np.log(1+c*max)
 	else:
 		a_norm = a
-	min = np.array(min)
-	minimum = np.log(1+c*min)
+		minimum = min
+		maximum = max
 	#if (min == -1):
 	#	minimum = np.amin(a_norm, axis=(0, 1, 2))
-	max= np.array(max)
-	maximum = np.log(1+c*max)
 	#if (max == -1):
 	#	maximum = np.amax(a_norm, axis=(0, 1, 2))
 	for z_dim in range(a_norm.shape[3]):
-		a_norm[:,:,:,z_dim]= ( a_norm[:,:,:,z_dim] - minimum[z_dim] ) /\
+		a_norm[:,:,:,z_dim] = ( a_norm[:,:,:,z_dim] - minimum[z_dim] ) /\
 								( maximum[z_dim]-minimum[z_dim] )
 	#
 	print("MIN: if (c>0) them log(1+c*min) else min: ", minimum)
@@ -654,7 +674,7 @@ def nor_g_ab(hist,c,min,max):
 	# c > 0: each value x is converted by applying the logarithic function new_x = log(1+c*x)
 	# min = -1: the minimum is computed
 	# max = -1: the maximum is computed
-	print("Normalizing g with AB approach...")
+	# print("Normalizing g with AB approach...")
 	if (c):
 		hist = np.log(1 + c * hist)
 		min = np.log(1 + c * np.array(min)) if (type(min) == list or min != -1) else min
@@ -663,19 +683,40 @@ def nor_g_ab(hist,c,min,max):
 	maximum = np.amax(hist, axis=(0, 1, 2)) if (type(max) == int and max == -1) else max
 
 	if len(hist.shape) == 3:
-		return (hist - minimum) / (maximum - minimum)
+		return (hist - minimum) / (maximum - minimum), minimum, maximum
 	
 	for z_dim in range(hist.shape[3]):
 		hist[:, :, :, z_dim] = (hist[:, :, :, z_dim] - minimum[z_dim]) / (maximum[z_dim] - minimum[z_dim])
-	print("MIN: if (c>0) then log(1+c*min) else min: ", minimum)
-	print("MAX: if (c>0) then log(1+c*max) else max: ", maximum)
-	return hist
+	# print("MIN: if (c>0) then log(1+c*min) else min: ", minimum)
+	# print("MAX: if (c>0) then log(1+c*max) else max: ", maximum)
+	return hist, minimum, maximum
 #
 def denorm_y_ab(y_nor, c, min, max):
 	print("Denormalizing y..")
 	min_log = math.log(1+c*min)
 	max_log = math.log(1+c*max)
 	delta = max_log - min_log
-	y = np.exp(y_nor * delta - min_log)
+	y = np.exp(y_nor * delta + min_log)
 	y = (y - 1)/c
 	return y
+
+def denorm_g_ab(hist, c, min_log, max_log):
+	print("Denormalizing y..")
+	if (hist.ndim == 4):
+		norm_h = np.zeros((hist.shape[0],hist.shape[1],hist.shape[2],hist.shape[3]))
+	elif (hist.ndim == 3):
+		norm_h = np.zeros((hist.shape[0],hist.shape[1],hist.shape[2]))
+	else:
+		norm_h = np.zeros((hist.shape[0]))
+
+	delta = max_log - min_log
+
+	if (hist.ndim == 4):
+		for z_dim in range(hist.shape[3]):
+			norm_h[:, :, :, z_dim] = np.exp(hist[:, :, :, z_dim] * delta[z_dim] + min_log[z_dim])
+			norm_h[:, :, :, z_dim] = (norm_h[:, :, :, z_dim] - 1)/c
+	elif (hist.ndim == 3):
+		for z_dim in range(hist.shape[3]):
+                        norm_h[:, :, z_dim] = np.exp(hist[:, :, z_dim] * delta[z_dim] + min_log[z_dim])
+                        norm_h[:, :, z_dim] = (norm_h[:, :, z_dim] - 1)/c
+	return norm_h
