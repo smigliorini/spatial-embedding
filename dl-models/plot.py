@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from tensorflow import keras
 import numpy as np
 def plot_freq(f):
   max = 0
@@ -251,7 +252,7 @@ def plot_h6_mix_neg(orig,dec,start,n):
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
   plt.show()
-def plot_h6_mix_neg_emb(orig,dec,emb,start,n):
+def plot_h6_mix_neg_emb(orig,dec,emb,start,n,file):
   plt.figure(figsize=(20, 8))
   for i in range(n):
     #
@@ -285,7 +286,7 @@ def plot_h6_mix_neg_emb(orig,dec,emb,start,n):
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     #
-    # display embedding
+    # diplay embedding
     #
     ax = plt.subplot(5, n, i + 1 + 2*n)
     embnorm = np.zeros((emb.shape[1],emb.shape[2],3))
@@ -347,7 +348,10 @@ def plot_h6_mix_neg_emb(orig,dec,emb,start,n):
     #plt.gray()
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
-  plt.show()
+  if (file != 'XXX'):
+    plt.savefig(file)
+  else:
+    plt.show()
 
 def plot_h6_mix_neg_emb_g(orig,dec,emb,start,n):
   plt.figure(figsize=(20, 8))
@@ -383,7 +387,7 @@ def plot_h6_mix_neg_emb_g(orig,dec,emb,start,n):
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     #
-    # display embedding
+    # diplay embedding
     #
     ax = plt.subplot(5, n, i + 1 + 2*n)
     embnorm = np.zeros((emb.shape[1],emb.shape[2],3))
@@ -407,3 +411,124 @@ def plot_h6_mix_neg_emb_g(orig,dec,emb,start,n):
     ax.get_yaxis().set_visible(False)
   plt.show()
 
+def plot_x(x,y,lmod,gmod,start,n):
+  # load local decoder
+  local_m = keras.models.load_model(lmod)
+  global_m = keras.models.load_model(gmod)
+  l_emb = x[start:start+n,:,:,0:3]
+  g_emb = x[start:start+n,:,:,3:5]
+  rq_emb = x[start:start+n,:,:,5:7]
+  y_sub = y[start:start+n]  
+  plt.figure(figsize=(20, 8))
+  for i in range(n):
+    l_hist = local_m.decoder(l_emb[i].reshape((-1,3072)))
+    g_hist = global_m.decoder(g_emb[i].reshape((-1,2048)))
+    rq_hist = global_m.decoder(rq_emb[i].reshape((-1,2048)))
+    #
+    # display local histogram features 0,2,4
+    #
+    ax = plt.subplot(5, n, i + 1)
+    
+    norm = np.zeros((128,128,3))
+    for j in range(128):
+      for k in range(128):
+        norm[j,k,0] = (1-l_hist[0,j,k,0])
+        norm[j,k,1] = (1-l_hist[0,j,k,2])
+        norm[j,k,2] = (1-l_hist[0,j,k,4])
+    plt.imshow(norm)
+    plt.title("LHist(0,2,4) ["+str(start+i)+"]")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display global histogram
+    #
+    ax = plt.subplot(5, n, i + 1 + n)
+    normg = np.zeros((128,128,3))
+    for j in range(128):
+      for k in range(128):
+        normg[j,k,0] = (1-g_hist[0,j,k,0])
+        normg[j,k,1] = 1
+        normg[j,k,2] = 1
+    plt.imshow(normg)
+    plt.title("GHist ["+str(start+i)+"]")
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display global histogram RQ
+    #
+    ax = plt.subplot(5, n, i + 1 + 2*n) 
+    normrq = np.zeros((128,128,3))
+    for j in range(128):
+      for k in range(128):
+        if (rq_hist[0,j,k,0]>0.001):
+          normrq[j,k,0] = 1
+        else:
+          normrq[j,k,0] = 0
+        normrq[j,k,1] = 0
+        normrq[j,k,2] = 0
+    plt.imshow(normrq)
+    plt.title("RQ "+str(y_sub[i]))
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+  plt.show()
+def plot_x_rq(x,y,lmod,gmod,start,n):
+  # load local decoder
+  local_m = keras.models.load_model(lmod)
+  global_m = keras.models.load_model(gmod)
+  l_emb = x[start:start+n,:,:,0:3]
+  g_emb = x[start:start+n,:,:,3:5]
+  rq_hist = x[start:start+n,:,:,5:6]
+  y_sub = y[start:start+n]
+  plt.figure(figsize=(20, 8))
+  for i in range(n):
+    l_hist = local_m.decoder(l_emb[i].reshape((-1,3072)))
+    g_hist = global_m.decoder(g_emb[i].reshape((-1,2048)))
+    #
+    # display local histogram features 0,2,4
+    #
+    ax = plt.subplot(5, n, i + 1)
+
+    norm = np.zeros((128,128,3))
+    for j in range(128):
+      for k in range(128):
+        norm[j,k,0] = (1-l_hist[0,j,k,0])
+        norm[j,k,1] = (1-l_hist[0,j,k,2])
+        norm[j,k,2] = (1-l_hist[0,j,k,4])
+    plt.imshow(norm)
+    plt.title("LHist(0,2,4) ["+str(start+i)+"]")
+    #plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display global histogram 
+    #
+    ax = plt.subplot(5, n, i + 1 + n)
+    normg = np.zeros((128,128,3))
+    for j in range(128):
+      for k in range(128):
+        normg[j,k,0] = (1-g_hist[0,j,k,0])
+        normg[j,k,1] = 1
+        normg[j,k,2] = 1
+    plt.imshow(normg)
+    plt.title("GHist ["+str(start+i)+"]")
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    #
+    # display global histogram RQ
+    #
+    ax = plt.subplot(5, n, i + 1 + 2*n) 
+    normrq = np.zeros((32,32,3))
+    for j in range(32):
+      for k in range(32):
+        if (rq_hist[i,j,k,0]>0.0001):
+          normrq[j,k,0] = 1
+        else:
+          normrq[j,k,0] = 0
+        normrq[j,k,1] = 0
+        normrq[j,k,2] = 0
+    plt.imshow(normrq)
+    plt.title("RQ "+str(y_sub[i]))
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+  plt.show()
