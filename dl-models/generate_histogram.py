@@ -80,7 +80,11 @@ def gen_hist_from_file(dimx,dimy,dimz,file):
 			
 			#DEBUG print(f'\t{row["i0"]},{row["i1"]}: {row["num_features"]}, {row["size"]}, {row["num_points"]}, {row["avg_area"]}, {row["avg_side_length_0"]}, {row["avg_side_length_1"]}.')
 			x = int(row["i0"])
+			if (x < 0 or x >=dimx):
+				continue
 			y = int(row["i1"])
+			if (y < 0 or y >=dimy):
+				continue
 			if (dimz >= 1):
 				h0[x,y,0] = int(row["num_features"])
 			if (dimz >= 2):
@@ -145,7 +149,10 @@ def gen_input_from_file(dimx,dimy,dimz,path,mbrFile,fieldName, suffix):
 		# searching MBR
 		name = (ff.rpartition("/")[2]).rpartition("_summary")[0]+suffix
 		print('Searching mbr for '+name)
-		mbr0 = mbr[name]
+		if name in mbr.keys():
+			mbr0 = mbr[name]
+		else:
+			mbr0 = dict([('minx', float(0.0)), ('miny', float(0.0)), ('maxx', float(1.0)), ('maxy', float(1.0))])
 		print('Find: ',mbr0)
 		# computing global histogram
 		hg[count] = gen_global_hist(h0, dimx, dimy, mbr0)
