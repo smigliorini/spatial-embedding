@@ -67,7 +67,7 @@ def nor_train(file_a, file_g, latent_dim, net_type, loc, glo, f1, f2):
 	#
 	print('Training autoencoder...')
 	# try:  48 96 192 384, 480, 768, 1536, 3072
-	latent_dim = 1536
+	# latent_dim = 1536
 	# DENSE, LOCAL YES, GLOBAL NO - AUTOENCODER = m.auto_encoder(0,1,0
 	# CNN, LOCAL YES, GLOBAL NO - AUTOENCODER = m.auto_encoder(1,1,0
 	autoenc, a_train_train, a_train_val =  m.auto_encoder(net_type,loc,glo,128,128,6,latent_dim,2,f1,f2,a_train,g_train)
@@ -94,9 +94,17 @@ def nor_train(file_a, file_g, latent_dim, net_type, loc, glo, f1, f2):
 	dec_a_test_denor = m.gh.denorm_g_ab(dec_a_test,1,min_a,max_a)
 	print("A_TEST: ", a_test[0,0,0,0]," ",a_test[10,0,0,0])
 	print("A_TEST_DEN: ", a_test_denor[0,0,0,0]," ",a_test_denor[10,0,0,0])
+	start_h = 0
+	end_h = 10
+	file_name = "ae_"
+	if (net_type == 0):
+		file_name += "DENSE_"
+	else:
+		file_name += "CNN_"
+	file_name += str(f1) + "-" + str(f2) + "_" + "emb_" + str(latent_dim) + "_" + str(start_h) + "-" + str(end_h)
 	print('Plotting...')
-	p.plot_h6_mix_neg_emb(a_test, dec_a_test, enc_a_test_reshape, 0, 10, 'ae_CNN_768')
-	return autoenc, a_test, dec_a_test, a_test_denor, dec_a_test_denor, enc_a_test_reshape
+	p.plot_h6_mix_neg_emb(a_test, dec_a_test, enc_a_test_reshape, start_h, (end_h - start_h), file_name)
+	return autoenc, a_test, dec_a_test, a_test_denor, dec_a_test_denor, enc_a_test_reshape, min_a, max_a, min_g, max_g
 #
 	#autoenc_g_tot_log, g_tot_train, g_tot_test =  m.auto_encoder(1,0,1,128,128,6,3,2,a_tot_norm_log,g_tot_norm_log,b_tot,r_tot)
 	#enc_g_tot_test = autoenc_g_tot_log.encoder(g_tot_test).numpy()

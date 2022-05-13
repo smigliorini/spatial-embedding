@@ -682,6 +682,8 @@ def nor_g_ab(hist,c,min,max):
 	# min = -1: the minimum is computed
 	# max = -1: the maximum is computed
 	# print("Normalizing g with AB approach...")
+	minimum_nolog = np.amin(hist, axis=(0, 1, 2))
+	maximum_nolog = np.amax(hist, axis=(0, 1, 2))
 	if (c):
 		hist = np.log(1 + c * hist)
 		min = np.log(1 + c * np.array(min)) if (type(min) == list or min != -1) else min
@@ -696,7 +698,7 @@ def nor_g_ab(hist,c,min,max):
 		hist[:, :, :, z_dim] = (hist[:, :, :, z_dim] - minimum[z_dim]) / (maximum[z_dim] - minimum[z_dim])
 	# print("MIN: if (c>0) then log(1+c*min) else min: ", minimum)
 	# print("MAX: if (c>0) then log(1+c*max) else max: ", maximum)
-	return hist, minimum, maximum
+	return hist, minimum_nolog, maximum_nolog
 #
 def denorm_y_ab(y_nor, c, min, max):
 	print("Denormalizing y..")
