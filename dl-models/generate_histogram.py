@@ -686,13 +686,13 @@ def nor_g_ab(hist,c,min,max):
 	maximum_nolog = np.amax(hist, axis=(0, 1, 2))
 	if (c):
 		hist = np.log(1 + c * hist)
-		min = np.log(1 + c * np.array(min)) if (type(min) == list or min != -1) else min
-		max = np.log(1 + c * np.array(max)) if (type(max) == list or max != -1) else max
+		min = np.log(1 + c * np.array(min)) if (type(min) == np.ndarray or min != -1) else min
+		max = np.log(1 + c * np.array(max)) if (type(max) == np.ndarray or max != -1) else max
 	minimum = np.amin(hist, axis=(0, 1, 2)) if (type(min) == int and min == -1) else min
 	maximum = np.amax(hist, axis=(0, 1, 2)) if (type(max) == int and max == -1) else max
 
 	if len(hist.shape) == 3:
-		return (hist - minimum) / (maximum - minimum), minimum, maximum
+		return (hist - minimum) / (maximum - minimum), minimum_nolog, maximum_nolog
 	
 	for z_dim in range(hist.shape[3]):
 		hist[:, :, :, z_dim] = (hist[:, :, :, z_dim] - minimum[z_dim]) / (maximum[z_dim] - minimum[z_dim])
@@ -709,7 +709,7 @@ def denorm_y_ab(y_nor, c, min, max):
 	y = (y - 1)/c
 	return y
 
-def denorm_g_ab(hist, c, min_log, max_log):
+def denorm_g_ab(hist, c, min, max):
 	print("Denormalizing y..")
 	if (hist.ndim == 4):
 		norm_h = np.zeros((hist.shape[0],hist.shape[1],hist.shape[2],hist.shape[3]))
@@ -717,6 +717,13 @@ def denorm_g_ab(hist, c, min_log, max_log):
 		norm_h = np.zeros((hist.shape[0],hist.shape[1],hist.shape[2]))
 	else:
 		norm_h = np.zeros((hist.shape[0]))
+
+	if (c):
+		min_log = np.log(1 + c * np.array(min))
+		max_log = np.log(1 + c * np.array(max))
+	else:
+		min_log = min
+		max_log = max
 
 	delta = max_log - min_log
 
