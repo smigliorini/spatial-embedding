@@ -15,7 +15,7 @@
         <dependency>
             <groupId>edu.ucr.cs.bdlab</groupId>
             <artifactId>beast-spark</artifactId>
-            <version>0.9.3-SNAPSHOT</version>
+            <version>0.9.4</version>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>

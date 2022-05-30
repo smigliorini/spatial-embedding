@@ -5,6 +5,7 @@ import edu.ucr.cs.bdlab.beast.geolite.IFeature;
 import edu.ucr.cs.bdlab.beast.io.SpatialReader;
 import edu.ucr.cs.bdlab.beast.operations.SpatialJoin;
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.rdd.RDD;
@@ -184,11 +185,11 @@ public class SJMaster {
         System.out.println("INFO:\tExecuting BNLJ...");
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
-        RDD<Tuple2<IFeature, IFeature>> sjResults;
+        JavaPairRDD<IFeature, IFeature> sjResults;
 
         long start = System.currentTimeMillis();
-        sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), esjPredicate,
-                SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ, mbr, new BeastOptions());
+        sjResults = SpatialJoin.spatialJoin(envelope1, envelope2, esjPredicate,
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ, mbr, null, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
         singleResults.addJoinResult(JoinAlgorithms.BNLJ, extractSingleSJ(start, mbr.count()));
         baos.reset();
@@ -198,11 +199,11 @@ public class SJMaster {
         System.out.println("INFO:\tExecuting PBSM...");
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
-        RDD<Tuple2<IFeature, IFeature>> sjResults;
+        JavaPairRDD<IFeature, IFeature> sjResults;
 
         long start = System.currentTimeMillis();
-        sjResults = SpatialJoin.spatialJoin(envelope1.rdd(), envelope2.rdd(), esjPredicate,
-                SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM, mbr, new BeastOptions());
+        sjResults = SpatialJoin.spatialJoin(envelope1, envelope2, esjPredicate,
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM, mbr, null, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
         singleResults.addJoinResult(JoinAlgorithms.PBSM, extractSingleSJ(start, mbr.count()));
         baos.reset();
@@ -211,11 +212,11 @@ public class SJMaster {
         System.out.println("INFO:\tExecuting DJ...");
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
-        RDD<Tuple2<IFeature, IFeature>> sjResults;
+        JavaPairRDD<IFeature, IFeature> sjResults;
 
         long start = System.currentTimeMillis();
-        sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2_par.rdd(), esjPredicate,
-                SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ, mbr, new BeastOptions());
+        sjResults = SpatialJoin.spatialJoin(envelope1_par, envelope2_par, esjPredicate,
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ, mbr, null, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
         singleResults.addJoinResult(JoinAlgorithms.DJ, extractSingleSJ(start, mbr.count()));
         baos.reset();
@@ -224,17 +225,17 @@ public class SJMaster {
         System.out.println("INFO:\tExecuting REPJ...");
         LongAccumulator mbr = sparkContext.sc().longAccumulator("MBRTests");
         baos.reset();
-        RDD<Tuple2<IFeature, IFeature>> sjResults;
+        JavaPairRDD<IFeature, IFeature> sjResults;
 
         long start = System.currentTimeMillis();
         if (envelope1.count() > envelope2.count()) {
             baos.reset();
-            sjResults = SpatialJoin.spatialJoin(envelope1_par.rdd(), envelope2.rdd(), esjPredicate,
-                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
+            sjResults = SpatialJoin.spatialJoin(envelope1_par, envelope2, esjPredicate,
+                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, null, new BeastOptions());
         } else {
             baos.reset();
-            sjResults = SpatialJoin.spatialJoin(envelope2_par.rdd(), envelope1.rdd(), esjPredicate,
-                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
+            sjResults = SpatialJoin.spatialJoin(envelope2_par, envelope1, esjPredicate,
+                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, null, new BeastOptions());
         }
         singleResults.setResultSJSize(sjResults.count());
         singleResults.addJoinResult(JoinAlgorithms.REPJ, extractSingleSJ(start, mbr.count()));

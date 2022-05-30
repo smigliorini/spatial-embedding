@@ -4,40 +4,49 @@ import org.apache.spark.SparkContext
 val sc: SparkContext = null
 import edu.ucr.cs.bdlab.beast._
 
-sc.readCSVPoint("inputfile.csv", "longitude", "latitude")
-  .reproject(org.geotools.referencing.CRS.decode("EPSG:3857"), org.geotools.referencing.CRS.decode("EPSG:4326"))
-  .saveAsCSVPoints("outputfile.csv")
+// Start copying from here
+//sc.readCSVPoint("inputfile.csv", "longitude", "latitude")
+//  .reproject(org.geotools.referencing.CRS.decode("EPSG:3857"), org.geotools.referencing.CRS.decode("EPSG:4326"))
+//  .saveAsCSVPoints("outputfile.csv")
 
 import edu.ucr.cs.bdlab.beast.operations.GriddedSummary
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.fs.PathFilter
 
-val summariesPath = new Path("sj_summaries")
-val paths = Array("sj/gap_datasets", "sj/large_datasets", "sj/medium_datasets", "sj/real_datasets", "sj/small_datasets").map(new Path(_))
+val summariesPath = new Path("real_summaries")
+//val paths = Array("sj/gap_datasets", "sj/large_datasets", "sj/medium_datasets", "sj/real_datasets", "sj/small_datasets").map(new Path(_))
+val paths = Array(/*"parks_partitioned", */"lakes_partitioned").map(new Path(_))
 val conf = sc.hadoopConfiguration
 for (path <- paths) {
   val filesystem = path.getFileSystem(conf)
   val datasets = filesystem.listStatus(path)
   for (dataset <- datasets) {
-    val summaryPath = new Path(summariesPath, new Path(path.getName, dataset.getPath.getName+"_summary"))
+    val summaryPath = new Path(summariesPath, new Path(path.getName, dataset.getPath.getName+"_summary.csv"))
     if (!filesystem.exists(summaryPath)) {
       println(s"Summarizing ${dataset.getPath}")
-      GriddedSummary.run(Seq("separator" -> ",", "iformat" -> "envelope", "numcells" -> "128,128"),
-        inputs = Array(dataset.getPath.toString),
-        outputs = Array(summaryPath.toString),
-        sc)
-      // Move the file out of the directory
-      val summaryFile = filesystem.listStatus(summaryPath, new PathFilter {
-        override def accept(path: Path) = path.getName.startsWith("part")
-      })
-      filesystem.rename(summaryFile.head.getPath, new Path(summaryPath.toString+".csv"))
-      filesystem.delete(summaryPath, true)
+      try {
+        val tempSummaryPath = new Path(summaryPath.getParent, summariesPath.getName+"_temp")
+        GriddedSummary.run(Seq("separator" -> "\t", "iformat" -> "wkt", "numcells" -> "128,128", "skipheader" -> true),
+          inputs = Array(dataset.getPath.toString),
+          outputs = Array(tempSummaryPath.toString),
+          sc)
+        // Move the file out of the directory
+        val summaryFile = filesystem.listStatus(tempSummaryPath, new PathFilter {
+          override def accept(path: Path): Boolean = path.getName.startsWith("part")
+        })
+        filesystem.rename(summaryFile.head.getPath, summaryPath)
+        filesystem.delete(tempSummaryPath, true)
+      } catch {
+        case _: Exception => System.err.println(s"Error summarizing file '$dataset'")
+      }
     } else {
-      println(s"Skipping $dataset")
+      println(s"Skipping ${dataset.getPath}")
     }
   }
 }
 
+
+///////
 import scala.util.Random
 import edu.ucr.cs.bdlab.beast.io.{CSVFeatureWriter, SpatialWriter}
 import edu.ucr.cs.bdlab.beast.generator.{BitDistribution, DiagonalDistribution, DistributionType, GaussianDistribution, ParcelDistribution, SierpinskiDistribution, UniformDistribution}
@@ -88,6 +97,6 @@ for (i <- 1 to numDatasets) {
   }
   val dataset: SpatialRDD = generator.generate(cardinality)
   // 1- Write the dataset to the output as a single file
-  dataset.writeSpatialFile(f"dataset-${i}%03d.csv", "envelope",
+  dataset.writeSpatialFile(f"dataset-$i%03d.csv", "envelope",
     Seq(SpatialWriter.CompatibilityMode -> true, CSVFeatureWriter.FieldSeparator -> ','))
 }

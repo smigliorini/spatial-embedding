@@ -193,11 +193,13 @@ object GenerateRandomData {
               else if (i <= 2000) SierpinskiDistribution
               else null
               globalSummaryOutput.synchronized {
-                globalSummaryOutput.println(s"${datasetName},${distribution},${globalSummary.getMinCoord(0)},${globalSummary.getMinCoord(1)}," +
-                  s"${globalSummary.getMaxCoord(0)},${globalSummary.getMaxCoord(1)}," +
-                  s"${globalSummary.numFeatures},${globalSummary.size}," +
-                  s"${globalSummary.numPoints},${globalSummary.averageSideLength(0)},${globalSummary.averageSideLength(1)}," +
-                  s"${globalSummary.averageArea},${e0},${e2}")
+                  val s = s"${datasetName},${distribution},${globalSummary.getMinCoord(0)},${globalSummary.getMinCoord(1)}," +
+                    s"${globalSummary.getMaxCoord(0)},${globalSummary.getMaxCoord(1)}," +
+                    s"${globalSummary.numFeatures},${globalSummary.size}," +
+                    s"${globalSummary.numPoints},${globalSummary.averageSideLength(0)},${globalSummary.averageSideLength(1)}," +
+                    s"${globalSummary.averageArea},${e0},${e2}"
+                  globalSummaryOutput.println(s)
+                  println(s"Printed '${s}'")
               }
             }
 
