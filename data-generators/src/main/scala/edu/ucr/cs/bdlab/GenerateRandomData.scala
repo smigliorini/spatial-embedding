@@ -245,7 +245,7 @@ object GenerateRandomData {
             i
           }
           catch {
-            case e: Exception => e.printStackTrace(); null
+            case e: Exception => e.printStackTrace(); i
           }})
         }
       }
