@@ -140,6 +140,7 @@ object GenerateRandomData {
         while (datasetsToGenerate.nonEmpty && datasetsBeingGenerated.size < parallelism) {
           val i = datasetsToGenerate.remove(datasetsToGenerate.size - 1)
           datasetsBeingGenerated.append(Future {
+            try {
             val dataset = generateDataset(sc, i)
             val datasetName = f"dataset-$i%04d"
             // 1- Write the dataset to the output as a single file
@@ -242,7 +243,10 @@ object GenerateRandomData {
               }
             }
             i
-          })
+          }
+          catch {
+            case e: Exception => e.printStackTrace(); null
+          }})
         }
       }
     }
