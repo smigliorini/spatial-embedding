@@ -29,7 +29,7 @@ import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.locationtech.jts.geom.{Envelope, GeometryFactory}
 
-import java.io.PrintStream
+import java.io.{File, FileOutputStream, PrintStream}
 import java.util.concurrent.TimeoutException
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -92,15 +92,15 @@ object GenerateRandomData {
     val queriesInput = commandline.getOptionValue("queries-input")
     var existingResults: Array[Row] = Array()
     val queriesOutput: PrintStream = if (queriesInput == null) null else {
-      val queriesOutputFile = new Path(outPath, commandline.getOptionValue("queries-output", "range-queries-result.csv"))
-      val outFS = queriesOutputFile.getFileSystem(sc.hadoopConfiguration)
-      if (outFS.exists(queriesOutputFile)) {
+      val queriesOutputFile = new File(commandline.getOptionValue("queries-output", "range-queries-result.csv"))
+
+      if (queriesOutputFile.exists()) {
         // Read existing results, if any
         existingResults = spark.read
           .option("delimiter", ";").option("header", true).option("inferschema", true)
           .csv(outPath.toString).collect()
       }
-      val out = new PrintStream(outFS.create(queriesOutputFile))
+      val out = new PrintStream(new FileOutputStream(queriesOutputFile))
       out.println("dataset;numQuery;queryArea;areaInt;cardinality;executionTime;mbrTests")
       existingResults.foreach(row => out.println(row.mkString(";")))
       out.flush()
@@ -212,7 +212,7 @@ object GenerateRandomData {
             // 4- Run range queries
             if (rangeQueries != null) {
               // Select all the matching queries
-              val queries: Array[Row] = rangeQueries.filter(s"datasetName='${datasetName}'").collect()
+              val queries: Array[Row] = rangeQueries.filter(s"dataset='${datasetName}'").collect()
               if (queries.nonEmpty) {
                 // Index the dataset
                 val indexedDataset = dataset.spatialPartition(classOf[RSGrovePartitioner],
@@ -222,10 +222,10 @@ object GenerateRandomData {
                 queries.foreach(row => {
                   // Run the query only if it does not already exist in the results
                   if (!existingResults.exists(r => r.getAs[Int]("numQuery") == iQuery && r.getAs[String]("dataset") == datasetName)) {
-                    val x1 = row.getAs[Double]("minX")
-                    val y1 = row.getAs[Double]("minY")
-                    val x2 = row.getAs[Double]("maxX")
-                    val y2 = row.getAs[Double]("maxY")
+                    val x1 = row.getAs[Double]("rq_minx")
+                    val y1 = row.getAs[Double]("rq_miny")
+                    val x2 = row.getAs[Double]("rq_maxx")
+                    val y2 = row.getAs[Double]("rq_maxy")
                     val numMBRTests = sc.longAccumulator
                     val query = geometryFactory.toGeometry(new Envelope(x1, x2, y1, y2))
                     val resultSize = indexedDataset.rangeQuery(query, numMBRTests).count()
