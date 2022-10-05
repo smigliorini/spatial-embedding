@@ -84,8 +84,8 @@ object GenerateRandomData {
     val summariesPath = new Path(outPath, commandline.getOptionValue("summaries", "summaries"))
     val imagePath = new Path(outPath, commandline.getOptionValue("images", "images"))
     val globalSummaryOutput: PrintStream = if (!commandline.hasOption("global-summary")) null else {
-      val globalSummaryPath = new Path(outPath, commandline.getOptionValue("global-summary"))
-      val out = new PrintStream(globalSummaryPath.getFileSystem(sc.hadoopConfiguration).create(globalSummaryPath))
+      val globalSummaryPath = new File(commandline.getOptionValue("global-summary"))
+      val out = new PrintStream(new FileOutputStream(globalSummaryPath))
       out.println("dataset,distribution,x1,y1,x2,y2,num_features,size,num_points,avg_area,avg_side_length_0,avg_side_length_1,E0,E2")
       out
     }
