@@ -15,7 +15,6 @@
  */
 package edu.ucr.cs.bdlab
 
-import edu.ucr.cs.bdlab.GenerateModifiedRandomData.globalMBR
 import edu.ucr.cs.bdlab.beast.generator._
 import edu.ucr.cs.bdlab.beast.geolite.EnvelopeNDLite
 import edu.ucr.cs.bdlab.beast.indexing.RSGrovePartitioner
@@ -27,6 +26,7 @@ import edu.ucr.cs.bdlab.davinci.SingleLevelPlot
 import org.apache.commons.cli.{BasicParser, HelpFormatter, Options}
 import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
+import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 import org.locationtech.jts.geom.{Envelope, GeometryFactory}
 
@@ -37,10 +37,14 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-object GenerateRandomData {
+/**
+ * This main function generates a slightly modified version of the random data generated in [[GenerateRandomData]].
+ * It overrides the box size parameters to produce bigger geometries.
+ */
+object GenerateModifiedRandomData {
   val globalMBR = new EnvelopeNDLite(2, 0, 0, 10, 10)
 
-  lazy val commandLineOptions: Options = {
+  val commandLineOptions: Options = {
     new Options()
       .addOption(new org.apache.commons.cli.Option("o", "output", true,
         "The path to write all output files"))
@@ -49,9 +53,11 @@ object GenerateRandomData {
       .addOption(new org.apache.commons.cli.Option("s", "summaries", true,
         "The path to write the summaries (relative to the output directory)"))
       .addOption(new org.apache.commons.cli.Option("gs", "global-summary", true,
-        "The path to write the file with global summary of all datasets to (relative to the output directory)"))
+        "The path to write the file with global summary of all datasets to (relative to the working dir)"))
       .addOption(new org.apache.commons.cli.Option("i", "images", true,
         "The path to write the images (relative to the output directory)"))
+      .addOption(new org.apache.commons.cli.Option("ds", "data-specs", true,
+        "A path to a file that contains the specs of the data to generate"))
       .addOption(new org.apache.commons.cli.Option("qi", "queries-input", true,
         "A path to a file that contains all range queries to execute"))
       .addOption(new org.apache.commons.cli.Option("qo", "queries-output", true,
@@ -60,8 +66,6 @@ object GenerateRandomData {
         "Print this help information"))
       .addOption(new org.apache.commons.cli.Option("p", "parallelism", true,
         "Level of parallelism is how many concurrent datasets are processed together"))
-      .addOption(new org.apache.commons.cli.Option("ds", "data-specs", true,
-        "A path to a file that contains the specs of the data to generate"))
   }
 
   def main(args: Array[String]): Unit = {
@@ -81,7 +85,7 @@ object GenerateRandomData {
     }
     val spark: SparkSession = SparkSession.builder().config(conf).getOrCreate()
     val sc: SparkContext = spark.sparkContext
-    val outPath = new Path(commandline.getOptionValue("output", "embedding-assorted-datasets"))
+    val outPath = new Path(commandline.getOptionValue("output", "embedding-assorted-datasets-modified"))
     val filesystem = outPath.getFileSystem(sc.hadoopConfiguration)
     val datasetsPath = new Path(outPath, commandline.getOptionValue("datasets", "datasets"))
     val summariesPath = new Path(outPath, commandline.getOptionValue("summaries", "summaries"))
@@ -117,17 +121,41 @@ object GenerateRandomData {
         .csv(queriesInput)
 
     try {
-      val numDatasets = 2000
-      val datasetsToGenerate = new collection.mutable.ArrayBuffer[Int]()
-      datasetsToGenerate ++= 1 to numDatasets
-      val datasetsBeingGenerated = new collection.mutable.ArrayBuffer[Future[Int]]()
+      // Read the specs of the data to generate
+      // Columns of importance to use:
+      // ds1, ds2: The dataset names to generate in the form of 'dataset-xxxx[_yyy]'.
+      //   xxxx is the seed to use for generation
+      //   _yyy addition suffix that indicates we should override the generated data.
+      // avgLenX1,avgLenX2,avgLenY1,avgLenY2: The average length along the x and y dimensions for both datasets
+      //   This information is used to override the generated data.
+      val dataSpecsFilename = commandline.getOptionValue("data-specs")
+      if (dataSpecsFilename == null)
+        throw new RuntimeException("data-specs file name must be provided")
+      val dataSpecs = spark.read
+        .option("delimiter", ",")
+        .option("header", true)
+        .option("inferschema", true)
+        .csv(dataSpecsFilename)
+        .persist(StorageLevel.MEMORY_ONLY)
+      dataSpecs.createOrReplaceTempView("dataspecs")
+
+      val datasetsToGenerate = new collection.mutable.ArrayBuffer[(String, Double)]()
+      datasetsToGenerate ++= (spark sql
+        """
+           SELECT DISTINCT * FROM (
+               (SELECT ds1 AS ds, array_max(Array(avgLenX1, avgLenY1)) AS avgSize FROM dataspecs)
+               UNION
+               (SELECT ds2 AS ds, array_max(Array(avgLenX2, avgLenY2)) AS avgSize FROM dataspecs)
+           )
+          """).collect.map(r => (r.getAs[String](0), r.getAs[Double](1)))
+      val datasetsBeingGenerated = new collection.mutable.ArrayBuffer[Future[String]]()
       val parallelism = commandline.getOptionValue("parallelism", "32").toInt
 
       if (!outPath.toString.startsWith("/dev/null"))
         outPath.getFileSystem(sc.hadoopConfiguration).mkdirs(outPath)
 
       while (datasetsToGenerate.nonEmpty || datasetsBeingGenerated.nonEmpty) {
-        // Check if any jobs are done
+        // Clean up any done jobs
         var i = 0
         while (i < datasetsBeingGenerated.size) {
           val datasetGenerationProcess = datasetsBeingGenerated(i)
@@ -141,11 +169,17 @@ object GenerateRandomData {
         }
         // Launch new jobs
         while (datasetsToGenerate.nonEmpty && datasetsBeingGenerated.size < parallelism) {
-          val i = datasetsToGenerate.remove(datasetsToGenerate.size - 1)
+          val ds: (String, Double) = datasetsToGenerate.remove(datasetsToGenerate.size - 1)
           datasetsBeingGenerated.append(Future {
             try {
-            val dataset = generateDataset(sc, i)
-            val datasetName = f"dataset-$i%04d"
+              val datasetName = ds._1
+              val i: Int = datasetName.substring(8, 12).toInt
+              // Generate the random data with or without override depending on whether the name is extended or not
+            val dataset = if (datasetName.length > 12)
+              GenerateRandomData.generateDataset(sc, i, ds._2)
+            else
+              GenerateRandomData.generateDataset(sc, i)
+
             // 1- Write the dataset to the output as a single file
             val datasetFile = new Path(datasetsPath, datasetName + ".wkt.bz2")
             if (!datasetFile.toString.startsWith("/dev/null") && !filesystem.isFile(datasetFile)) {
@@ -245,10 +279,10 @@ object GenerateRandomData {
                 indexedDataset.unpersist()
               }
             }
-            i
+            datasetName
           }
           catch {
-            case e: Exception => e.printStackTrace(); i
+            case e: Exception => e.printStackTrace(); ds._1
           }})
         }
       }
@@ -263,66 +297,6 @@ object GenerateRandomData {
       }
     }
 
-  }
-
-  def generateDataset(sc: SparkContext, i: Int, avg_size: Double = -1): SpatialRDD = {
-    import edu.ucr.cs.bdlab.beast._
-    def randomDouble(random: Random, range: Array[Double]) = {
-      random.nextDouble() * (range(1) - range(0)) + range(0)
-    }
-
-    val boxSizes: Array[Double] = Array(1E-5, 0.1)
-    val distributions: Array[DistributionType] =
-      Array(UniformDistribution, GaussianDistribution, BitDistribution,
-        ParcelDistribution, DiagonalDistribution, SierpinskiDistribution)
-    val cardinalities = Array(50000, 50000000)
-    val numSegments = Array(5, 50)
-    val percentages = Array(0.5, 0.9)
-    val buffers = Array(0.05, 0.3)
-    // For bit distribution
-    val probabilities = Array(0.5, 0.9)
-    // For parcel
-    val splitRanges = Array(0.1, 0.5)
-    val dither = Array(0.1, 0.5)
-
-    val random = new Random(i)
-    val distribution: DistributionType = if (i <= 1000) UniformDistribution
-    else if (i <= 1200) DiagonalDistribution
-    else if (i <= 1400) GaussianDistribution
-    else if (i <= 1600) ParcelDistribution
-    else if (i <= 1800) BitDistribution
-    else if (i <= 2000) SierpinskiDistribution
-    else null
-    val cardinality = random.nextInt(cardinalities(1) - cardinalities(0)) + cardinalities(0)
-    val mbrWidth = randomDouble(random, Array(1.0, globalMBR.getSideLength(0)))
-    val mbrHeight = randomDouble(random, Array(1.0, globalMBR.getSideLength(1)))
-    val x1 = randomDouble(random, Array(globalMBR.getMinCoord(0), globalMBR.getMaxCoord(0) - mbrWidth))
-    val y1 = randomDouble(random, Array(globalMBR.getMinCoord(1), globalMBR.getMaxCoord(1) - mbrHeight))
-    val datasetMBR = new EnvelopeNDLite(2, x1, y1, x1 + mbrWidth, y1 + mbrHeight)
-    val generator = sc.generateSpatialData.mbr(datasetMBR)
-      .config(UniformDistribution.MaxSize, s"${randomDouble(random, boxSizes) / (mbrWidth max mbrHeight)}")
-      .config(UniformDistribution.NumSegments, s"${random.nextInt(numSegments(1) - numSegments(0)) + numSegments(0)}")
-      .config(UniformDistribution.GeometryType, "polygon")
-      .config(SpatialGenerator.Seed, i)
-      .distribution(distribution)
-    // Override the size if requested
-    // Note 1: To keep all other parameters the same, we don't want to skip the random number generation
-    // Note 2: The override size is the average so we need to double it to compute the maximum
-    if (avg_size > 0)
-      generator.config(UniformDistribution.MaxSize, s"${avg_size * 2 / (mbrWidth max mbrHeight)}")
-    distribution match {
-      case BitDistribution =>
-        generator.config(BitDistribution.Digits, 12)
-          .config(BitDistribution.Probability, randomDouble(random, probabilities))
-      case ParcelDistribution =>
-        generator.config(ParcelDistribution.SplitRange, randomDouble(random, splitRanges))
-          .config(ParcelDistribution.Dither, randomDouble(random, dither))
-      case DiagonalDistribution =>
-        generator.config(DiagonalDistribution.Buffer, randomDouble(random, buffers))
-          .config(DiagonalDistribution.Percentage, randomDouble(random, percentages))
-      case _ => // Nothing need to be done but the case has to be added to avoid no match exception
-    }
-    generator.generate(cardinality)
   }
 
 }
