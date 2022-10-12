@@ -1,4 +1,6 @@
 import org.apache.commons.cli.*;
+import org.apache.hadoop.fs.Path;
+
 import java.io.*;
 import java.util.Arrays;
 import java.util.Locale;
@@ -16,6 +18,7 @@ public class SpatialJoin {
         options.addOption("d", "dj", false, "Execute the spatial joins using the DJ algorithm");
         options.addOption("r", "repj", false, "Execute the spatial joins using the REPJ algorithm");
         options.addOption("h", "help", false, "Print this message");
+        options.addOption("dir", "dir", true, "The directory under the input data exists");
         options.addOption("i", "input", true, "Specify the file containing the list of datasets to use for the spatial join");
         options.addOption("o", "output", true, "Specify the directory that will contain the files with the statistical information regarding the spatial join executions");
         HelpFormatter formatter = new HelpFormatter();
@@ -36,8 +39,6 @@ public class SpatialJoin {
             System.out.println("Folder /tmp/spark-events has been created to store the logs of Spark");
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream(1000000);
-        //System.setErr(new PrintStream(baos));
-        assert cmd != null;
 
         if( ! new File(cmd.getOptionValue("output", ".")).exists()){
             System.out.println("ERROR:The folder "+cmd.getOptionValue("output", ".")+"/ does not exists.\n" +
@@ -91,8 +92,8 @@ public class SpatialJoin {
             algorithmToUse = new boolean[]{true,true,true,true};
         else
             algorithmToUse = new boolean[]{cmd.hasOption("b") ,cmd.hasOption("p") ,cmd.hasOption("d") ,cmd.hasOption("r")};
-
-        sjMaster.run(cmd.getOptionValue("output", "."),cmd.hasOption("s"),algorithmToUse);
+        sjMaster.setInputDir(new Path(cmd.getOptionValue("dir", ".")));
+        sjMaster.run(cmd.getOptionValue("output", "."), cmd.hasOption("s"), algorithmToUse);
         sjMaster.stop();
 
         System.exit(0);

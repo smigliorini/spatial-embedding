@@ -4,6 +4,7 @@ import edu.ucr.cs.bdlab.beast.common.BeastOptions;
 import edu.ucr.cs.bdlab.beast.geolite.IFeature;
 import edu.ucr.cs.bdlab.beast.io.SpatialReader;
 import edu.ucr.cs.bdlab.beast.operations.SpatialJoin;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -37,6 +38,8 @@ public class SJMaster {
     private JavaRDD<IFeature> envelope2;
     private JavaRDD<IFeature> envelope1_par;
     private JavaRDD<IFeature> envelope2_par;
+    private Path inputDir;
+
     /**
      *
      * @param pathfile path of the file containing the list of the datasets to be used and their relative partitioned version.
@@ -102,6 +105,10 @@ public class SJMaster {
                 "saved results and their execution will be skipped");
     }
 
+    public void setInputDir(Path inputDir) {
+        this.inputDir = inputDir;
+    }
+
     /**
      *  Return the results of the executions of the spatial joins
      */
@@ -119,15 +126,15 @@ public class SJMaster {
     public void run(String path, boolean safe, boolean[] algorithmsToUse){
 
         int totalNumCouple = (datasets1.size());
-        BeastOptions beastOptions = new BeastOptions();//.set("separator", ',');
+        BeastOptions beastOptions = new BeastOptions().set("skipheader", true);//.set("separator", ',');
         String format = "wkt";
         for (int i = 0; i < totalNumCouple ; i++){
             System.out.println("INFO: Working on the couple n° " + (i+1) +" of " + totalNumCouple+".");
 
-            envelope1 = SpatialReader.readInput(sparkContext, beastOptions, datasets1.get(i), format);
-            envelope1_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid1.get(i), format);
-            envelope2 = SpatialReader.readInput(sparkContext, beastOptions, datasets2.get(i), format);
-            envelope2_par = SpatialReader.readInput(sparkContext, beastOptions, datasets_grid2.get(i), format);
+            envelope1 = SpatialReader.readInput(sparkContext, beastOptions, new Path(inputDir, datasets1.get(i)).toString(), format);
+            envelope1_par = SpatialReader.readInput(sparkContext, beastOptions, new Path(inputDir, datasets_grid1.get(i)).toString(), format);
+            envelope2 = SpatialReader.readInput(sparkContext, beastOptions, new Path(inputDir, datasets2.get(i)).toString(), format);
+            envelope2_par = SpatialReader.readInput(sparkContext, beastOptions, new Path(inputDir, datasets_grid2.get(i)).toString(), format);
 
             results.addEntry(datasets1.get(i) + "," + datasets2.get(i),
                     executeSJ(algorithmsToUse));
