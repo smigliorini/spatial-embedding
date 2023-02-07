@@ -7,7 +7,8 @@
 - medium datasets: 250 MB to 650 MB
 - large datasets: 1GB to 3 GB
 - gap datasets: 100MB to 250 MB and 650 to 1GB
-### Real datasets: lakes and parks, from 1 MB to 4.5 GB 
+### Real datasets: 
+- lakes and parks, from 1 MB to 4.5 GB 
 
 ## Folders organization (each folder contains its own readme file) :
 0. summaries: this folder contains the summaries of datasets characteristics, in particular:
