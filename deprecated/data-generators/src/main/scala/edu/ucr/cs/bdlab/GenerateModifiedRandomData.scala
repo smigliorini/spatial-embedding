@@ -25,6 +25,8 @@ import edu.ucr.cs.bdlab.beast.{SpatialRDD, _}
 import edu.ucr.cs.bdlab.davinci.SingleLevelPlot
 import org.apache.commons.cli.{BasicParser, HelpFormatter, Options}
 import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
+import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
@@ -182,7 +184,11 @@ object GenerateModifiedRandomData {
               GenerateRandomData.generateDataset(sc, i)
             if (datasetDescriptors != null) {
               datasetDescriptors.synchronized {
-                datasetDescriptors.println(dataset.asInstanceOf[RandomSpatialRDD].descriptor.json)
+                val info: Row = dataset.asInstanceOf[RandomSpatialRDD].descriptor
+                val values: Array[Object] = dataset +: Row.unapplySeq(info).toArray
+                val schema: Seq[StructField] = StructField("name", StringType) +: info.schema
+                val finalRow = new GenericRowWithSchema(values.toArray, StructType(schema))
+                datasetDescriptors.println(finalRow.json)
               }
             }
 
