@@ -185,7 +185,7 @@ object GenerateModifiedRandomData {
             if (datasetDescriptors != null) {
               datasetDescriptors.synchronized {
                 val info: Row = dataset.asInstanceOf[RandomSpatialRDD].descriptor
-                val values: Array[Object] = dataset +: Row.unapplySeq(info).toArray
+                val values: Array[Object] = datasetName +: Row.unapplySeq(info).toArray
                 val schema: Seq[StructField] = StructField("name", StringType) +: info.schema
                 val finalRow = new GenericRowWithSchema(values.toArray, StructType(schema))
                 datasetDescriptors.println(finalRow.json)
