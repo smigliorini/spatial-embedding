@@ -9,10 +9,8 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.rdd.RDD;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.LongAccumulator;
-import scala.Tuple2;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -82,7 +80,7 @@ public class SJMaster {
         results = new Results();
     }
 
-    public void resume(String partialResultsPath){
+    public void resumeFromJSON(String partialResultsPath){
         Gson gson = new Gson(); // Or use new GsonBuilder().create();
         try {
             this.results = gson.fromJson(new FileReader(partialResultsPath), Results.class);
@@ -104,6 +102,35 @@ public class SJMaster {
         System.out.println("INFO: "+ (initialNofDatasets - datasets1.size())+" couple of datasets has been found in the " +
                 "saved results and their execution will be skipped");
     }
+
+    public void resumeFromCSV(String partialResultsPath) {
+        try {
+            this.results = new Results();
+            BufferedReader reader = new BufferedReader(new FileReader(partialResultsPath));
+            // Skip header line
+            reader.readLine();
+            String line;
+            int initialNofDatasets = datasets1.size();
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                String ds1 = parts[0];
+                String ds2 = parts[1];
+                for (int i = 0; i < datasets1.size(); i++) {
+                    if (ds1.equals(datasets1.get(i)) && ds2.equals(datasets2.get(i))) {
+                        datasets1.remove(i);
+                        datasets2.remove(i);
+                        datasets_grid1.remove(i);
+                        datasets_grid2.remove(i);
+                    }
+                }
+            }
+            System.out.println("INFO: " + (initialNofDatasets - datasets1.size()) + " couple of datasets has been found in the " +
+                "saved results and their execution will be skipped");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     public void setInputDir(Path inputDir) {
         this.inputDir = inputDir;

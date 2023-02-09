@@ -53,7 +53,7 @@ public class SpatialJoin {
         File [] files = folder.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.endsWith(".json");
+                return name.endsWith(".csv");
             }
         });
         File last = null;
@@ -84,7 +84,8 @@ public class SpatialJoin {
         }
 
         if(last != null){
-            sjMaster.resume(last.getAbsolutePath());
+            //sjMaster.resumeFromJSON(last.getAbsolutePath());
+            sjMaster.resumeFromCSV(last.getAbsolutePath());
         }
 
         boolean[] algorithmToUse;

@@ -12,3 +12,11 @@ Store all output to the `non-partitioned-files` directory.
 ```shell
 beast --class edu.ucr.cs.bdlab.GenerateRandomData target/data-generators-*.jar -d non-partitioned-files -gs global-summaries.csv -i /dev/null 
 ```
+
+
+## Generate Modified Data
+To generate modified data that will hopefully produce more balanced spatial join datasets,
+run the following command.
+```shell
+beast --class edu.ucr.cs.bdlab.GenerateModifiedRandomData target/data-generators-*.jar -o modified-sj-datasets-small -d datasets -s histograms -i /dev/null -gs global-summaries.csv -ds jn_result_3791_balanced.csv
+```

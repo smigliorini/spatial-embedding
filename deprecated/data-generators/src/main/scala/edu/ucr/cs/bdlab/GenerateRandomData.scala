@@ -275,7 +275,8 @@ object GenerateRandomData {
     val distributions: Array[DistributionType] =
       Array(UniformDistribution, GaussianDistribution, BitDistribution,
         ParcelDistribution, DiagonalDistribution, SierpinskiDistribution)
-    val cardinalities = Array(50000, 50000000)
+    // val cardinalities = Array(50000, 50000000) // Range for big dataset
+    val cardinalities = Array(500, 500000) // Range for small datasets
     val numSegments = Array(5, 50)
     val percentages = Array(0.5, 0.9)
     val buffers = Array(0.05, 0.3)

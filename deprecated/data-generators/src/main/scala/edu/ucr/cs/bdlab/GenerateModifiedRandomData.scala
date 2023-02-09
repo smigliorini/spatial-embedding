@@ -96,6 +96,7 @@ object GenerateModifiedRandomData {
       out.println("dataset,distribution,x1,y1,x2,y2,num_features,size,num_points,avg_area,avg_side_length_0,avg_side_length_1,E0,E2")
       out
     }
+    val datasetDescriptors: PrintStream = new PrintStream(new FileOutputStream("dataset-descriptors.json"))
     val queriesInput = commandline.getOptionValue("queries-input")
     var existingResults: Array[Row] = Array()
     val queriesOutput: PrintStream = if (queriesInput == null) null else {
@@ -143,9 +144,9 @@ object GenerateModifiedRandomData {
       datasetsToGenerate ++= (spark sql
         """
            SELECT DISTINCT * FROM (
-               (SELECT ds1 AS ds, array_max(Array(avgLenX1, avgLenY1)) AS avgSize FROM dataspecs)
+               (SELECT ds1 AS ds, 5*array_max(Array(avgLenX1, avgLenY1)) AS avgSize FROM dataspecs)
                UNION
-               (SELECT ds2 AS ds, array_max(Array(avgLenX2, avgLenY2)) AS avgSize FROM dataspecs)
+               (SELECT ds2 AS ds, 5*array_max(Array(avgLenX2, avgLenY2)) AS avgSize FROM dataspecs)
            )
           """).collect.map(r => (r.getAs[String](0), r.getAs[Double](1)))
       val datasetsBeingGenerated = new collection.mutable.ArrayBuffer[Future[String]]()
@@ -179,6 +180,11 @@ object GenerateModifiedRandomData {
               GenerateRandomData.generateDataset(sc, i, ds._2)
             else
               GenerateRandomData.generateDataset(sc, i)
+            if (datasetDescriptors != null) {
+              datasetDescriptors.synchronized {
+                datasetDescriptors.println(dataset.asInstanceOf[RandomSpatialRDD].descriptor.json)
+              }
+            }
 
             // 1- Write the dataset to the output as a single file
             val datasetFile = new Path(datasetsPath, datasetName + ".wkt.bz2")
@@ -291,6 +297,8 @@ object GenerateModifiedRandomData {
       spark.stop()
       if (queriesOutput != null)
         queriesOutput.close()
+      if (datasetDescriptors != null)
+        datasetDescriptors.close()
       if (globalSummaryOutput != null) {
         globalSummaryOutput.flush()
         globalSummaryOutput.close()
