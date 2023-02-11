@@ -20,3 +20,10 @@ run the following command.
 ```shell
 beast --class edu.ucr.cs.bdlab.GenerateModifiedRandomData target/data-generators-*.jar -o modified-sj-datasets-small -d datasets -s histograms -i /dev/null -gs global-summaries.csv -ds jn_result_3791_balanced.csv
 ```
+
+
+## Generate data from a descriptor file
+To generate data from a file that contains descriptors, use the following command
+```shell
+beast --class edu.ucr.cs.bdlab.GenerateFromDescriptors target/data-generators-*.jar --data-descriptor modified-descriptors.json -o modified-sj-datasets-small-rotated -d datasets -s histograms -i /dev/null -gs global-summaries.csv
+```
