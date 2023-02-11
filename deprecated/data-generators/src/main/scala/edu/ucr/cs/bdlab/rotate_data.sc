@@ -2,6 +2,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql.Row.unapplySeq
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
+import org.apache.spark.sql.types.{StructField, StructType}
 
 val spark: SparkSession = SparkSession.builder().master("local").getOrCreate()
 val sc: SparkContext = spark.sparkContext
@@ -41,7 +42,11 @@ for (newDataPair <- newDataPairs) {
     })
     // Rotate the dataset randomly and ensure it fits the global MBR of 0,0,20,20
     val rot = rotatedDSExp.findFirstIn(newDataPair._1).get
-    val random = new Random(rot.substring(2, rot.length - ".wkt.bz2".length).toInt)
+    val seed: Int = rot.substring(2, rot.length - ".wkt.bz2".length).toInt
+    val random = new Random(seed)
+    // Generate and discard first random number which is almost the same for all small seeds
+    // https://stackoverflow.com/questions/12282628/why-are-initial-random-numbers-similar-when-using-similar-seeds
+    random.nextDouble()
     val angle = random.nextDouble() * Math.PI
     val matrices = originalDataPair.map(x => new AffineTransform(x.getAs[String]("affineMatrix").split(",").map(_.toDouble)))
     var mbrs = matrices.map(m => mbr(m))
@@ -78,11 +83,22 @@ for (newDataPair <- newDataPairs) {
     // Write the new descriptor to the output
     for (i <- 0 to 1) {
       val originalDescriptor = originalDataPair(i)
-      val values: Array[Any] = unapplySeq(originalDescriptor).get.toArray
+      var values: Array[Any] = unapplySeq(originalDescriptor).get.toArray
+      var schema: Array[StructField] = originalDescriptor.schema.toArray
       val matrixParts = new Array[Double](6)
       matrices(i).getMatrix(matrixParts)
       values(originalDescriptor.fieldIndex("affineMatrix")) = matrixParts.mkString(",")
-      val newDescriptor = new GenericRowWithSchema(values, originalDescriptor.schema)
+      values(originalDescriptor.fieldIndex("name")) = if (i == 0) newDataPair._1 else newDataPair._2
+      var iAttr = 0
+      while (iAttr < values.length) {
+        if (values(iAttr) == null) {
+          values = values.slice(0, iAttr) ++ values.slice(iAttr + 1, values.length)
+          schema = schema.slice(0, iAttr) ++ schema.slice(iAttr + 1, values.length)
+        } else {
+          iAttr += 1
+        }
+      }
+      val newDescriptor = new GenericRowWithSchema(values, StructType(schema))
       outputDatasets.println(newDescriptor.json)
     }
   }
