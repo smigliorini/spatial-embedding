@@ -89,18 +89,13 @@ for (newDataPair <- newDataPairs) {
       matrices(i).getMatrix(matrixParts)
       values(originalDescriptor.fieldIndex("affineMatrix")) = matrixParts.mkString(",")
       values(originalDescriptor.fieldIndex("name")) = if (i == 0) newDataPair._1 else newDataPair._2
-      var iAttr = 0
-      while (iAttr < values.length) {
-        if (values(iAttr) == null) {
-          values = values.slice(0, iAttr) ++ values.slice(iAttr + 1, values.length)
-          schema = schema.slice(0, iAttr) ++ schema.slice(iAttr + 1, values.length)
-        } else {
-          iAttr += 1
-        }
-      }
+      val nonNullAtts = values.zip(schema).filter(_._1 != null)
+      values = nonNullAtts.map(_._1)
+      schema = nonNullAtts.map(_._2)
       val newDescriptor = new GenericRowWithSchema(values, StructType(schema))
       outputDatasets.println(newDescriptor.json)
     }
   }
 }
 outputDatasets.close()
+println("Done!")
