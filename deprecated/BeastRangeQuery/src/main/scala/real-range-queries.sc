@@ -6,8 +6,8 @@ val sc: SparkContext = spark.sparkContext
 import edu.ucr.cs.bdlab.beast._
 
 // Start copying from here
-import edu.ucr.cs.bdlab.beast.geolite.{EnvelopeND, EnvelopeNDLite, GeometryReader}
-import edu.ucr.cs.bdlab.beast.synopses.Summary
+import org.locationtech.jts.geom.Envelope
+import edu.ucr.cs.bdlab.beast.geolite.GeometryReader
 import java.util.concurrent.TimeoutException
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
@@ -75,7 +75,9 @@ try {
         dataset.persist(StorageLevel.MEMORY_ONLY)
         dataset.count()
         val t2 = System.nanoTime()
-        datasetMBR.put(datasetName, dataset.summary)
+        val summary = dataset.summary
+        val mbr = new Envelope(summary.getMinCoord(0), summary.getMaxCoord(0), summary.getMinCoord(1), summary.getMaxCoord(1))
+        datasetMBR.put(datasetName, mbr)
         datasetLoadingTime.put(datasetName, t2 - t1)
         dataset
       })
@@ -83,19 +85,28 @@ try {
       runningQueries.append(Future {
         try {
           val t1 = System.nanoTime()
-          val x1 = queryToRun.getAs[Double]("rq_minx")
-          val y1 = queryToRun.getAs[Double]("rq_miny")
-          val x2 = queryToRun.getAs[Double]("rq_maxx")
-          val y2 = queryToRun.getAs[Double]("rq_maxy")
-          val queryMBR = new EnvelopeNDLite(2, x1, y1, x2, y2)
+          val scaledMBR = new Envelope(
+            queryToRun.getAs[Double]("minx"), queryToRun.getAs[Double]("maxx"),
+            queryToRun.getAs[Double]("miny"), queryToRun.getAs[Double]("maxy")
+          )
+          val x1 = (queryToRun.getAs[Double]("rq_minx") - scaledMBR.getMinX) / scaledMBR.getWidth
+          val y1 = (queryToRun.getAs[Double]("rq_miny") - scaledMBR.getMinY) / scaledMBR.getHeight
+          val x2 = (queryToRun.getAs[Double]("rq_maxx") - scaledMBR.getMinX) / scaledMBR.getWidth
+          val y2 = (queryToRun.getAs[Double]("rq_maxy") - scaledMBR.getMinY) / scaledMBR.getHeight
+
+          val dataMBR = datasetMBR(datasetName)
+          val queryMBR = new Envelope(x1 * dataMBR.getWidth + dataMBR.getMinX,
+            x2 * dataMBR.getWidth + dataMBR.getMinX,
+            y1 * dataMBR.getHeight + dataMBR.getMinY,
+            y2 * dataMBR.getHeight + dataMBR.getMinY)
           val mbrCount = sc.longAccumulator("num-mbr")
-          val cardinality = dataset.rangeQuery(new EnvelopeND(geometryFactory, queryMBR), mbrCount).count()
+          val cardinality = dataset.rangeQuery(geometryFactory.toGeometry(queryMBR), mbrCount).count()
           val t2 = System.nanoTime()
           val queryTime = t2 - t1
           QueryResult(datasetName,
             queryToRun.getAs[Int]("numQuery"),
             queryMBR.getArea,
-            queryMBR.intersectionEnvelope(datasetMBR(datasetName)).getArea,
+            queryMBR.intersection(scaledMBR).getArea,
             cardinality,
             queryTime,
             datasetLoadingTime(datasetName),
