@@ -34,7 +34,7 @@ val runningQueries = new collection.mutable.ArrayBuffer[Future[QueryResult]]()
 val cachedDatasets = new collection.mutable.HashMap[String, SpatialRDD]()
 val datasetLoadingTime = new collection.mutable.HashMap[String, Long]()
 val cachedDatasetsCount = new collection.mutable.HashMap[String, Int]()
-val datasetMBR = new collection.mutable.HashMap[String, Summary]()
+val datasetMBR = new collection.mutable.HashMap[String, Envelope]()
 try {
   while (queries.nonEmpty || runningQueries.nonEmpty) {
     // Try to finish some of the queries
@@ -100,7 +100,9 @@ try {
             y1 * dataMBR.getHeight + dataMBR.getMinY,
             y2 * dataMBR.getHeight + dataMBR.getMinY)
           val mbrCount = sc.longAccumulator("num-mbr")
-          val cardinality = dataset.rangeQuery(geometryFactory.toGeometry(queryMBR), mbrCount).count()
+          val cardinality = if (queryMBR.getArea > 0)
+            dataset.rangeQuery(geometryFactory.toGeometry(queryMBR), mbrCount).count()
+          else 0
           val t2 = System.nanoTime()
           val queryTime = t2 - t1
           QueryResult(datasetName,
