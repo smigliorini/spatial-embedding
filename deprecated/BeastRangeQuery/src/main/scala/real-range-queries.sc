@@ -18,16 +18,17 @@ import org.apache.spark.storage.StorageLevel
 import java.io.FileOutputStream
 import scala.concurrent.ExecutionContext.Implicits.global
 
+val workingDir = ""
 val outputPath = "range-query-output.csv"
 val conf = sc.hadoopConfiguration
 // A set of all queries that ran previously
 var previouslyRunQueries = Set[(String, Int)]()
-val file = new File(outputPath)
+val file = new File(workingDir+outputPath)
 val writer = new PrintStream(new FileOutputStream(file))
 case class QueryResult(dataset: String, numQuery: Int, queryArea: Double, areaInt: Double, cardinality: Long, executionTime: Long, datasetLoading: Long, totalTime: Long, mbrTests: Long)
 writer.println("dataset,numQuery,queryArea,areaInt,cardinality,executionTime(sec),datasetLoading(sec),totalTime(sec),mbrTests")
 val queries = new collection.mutable.ArrayBuffer[Row]()
-spark.read.option("delimiter", ",").option("header", true).option("inferschema", true).csv("rq_result_35925_balanced.csv").createOrReplaceTempView("queries")
+spark.read.option("delimiter", ",").option("header", true).option("inferschema", true).csv(workingDir+"rq_result_35925_balanced.csv").createOrReplaceTempView("queries")
 queries ++= spark.sql("SELECT *, ROW_NUMBER() OVER (PARTITION BY dataset ORDER BY minx) as numQuery FROM queries").collect()
 val parallelism = 32
 val runningQueries = new collection.mutable.ArrayBuffer[Future[QueryResult]]()
@@ -41,9 +42,7 @@ try {
     var i = 0
     while (i < runningQueries.size) {
       try {
-        println(s"Checking running query #$i")
         val result: QueryResult = Await.result(runningQueries(i), Duration.fromNanos(1E9))
-        println("Got result")
         writer.println(Array(
           result.dataset,
           result.numQuery,
@@ -71,7 +70,7 @@ try {
       val datasetName = queryToRun.getAs[String]("dataset")
       val dataset: SpatialRDD = cachedDatasets.getOrElseUpdate(datasetName, {
         val t1 = System.nanoTime()
-        val dataset = sc.readWKTFile(datasetName, 0, '\t', true)
+        val dataset = sc.readWKTFile(workingDir+datasetName, 0, '\t', true)
         dataset.persist(StorageLevel.MEMORY_ONLY)
         dataset.count()
         val t2 = System.nanoTime()
@@ -88,6 +87,10 @@ try {
           val scaledMBR = new Envelope(
             queryToRun.getAs[Double]("minx"), queryToRun.getAs[Double]("maxx"),
             queryToRun.getAs[Double]("miny"), queryToRun.getAs[Double]("maxy")
+          )
+          val scaledQueryMBR = new Envelope(
+            queryToRun.getAs[Double]("rq_minx"), queryToRun.getAs[Double]("rq_maxx"),
+            queryToRun.getAs[Double]("rq_miny"), queryToRun.getAs[Double]("rq_maxy")
           )
           val x1 = (queryToRun.getAs[Double]("rq_minx") - scaledMBR.getMinX) / scaledMBR.getWidth
           val y1 = (queryToRun.getAs[Double]("rq_miny") - scaledMBR.getMinY) / scaledMBR.getHeight
@@ -107,8 +110,8 @@ try {
           val queryTime = t2 - t1
           QueryResult(datasetName,
             queryToRun.getAs[Int]("numQuery"),
-            queryMBR.getArea,
-            queryMBR.intersection(scaledMBR).getArea,
+            scaledQueryMBR.getArea,
+            scaledQueryMBR.intersection(scaledMBR).getArea,
             cardinality,
             queryTime,
             datasetLoadingTime(datasetName),
