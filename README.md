@@ -1,4 +1,9 @@
 # Spatial embeddings project 
+
+## Mendeley Repository
+Datasets, training sets and trained models can be downloaded from a [Mendeley Data Repository](https://data.mendeley.com/datasets/zp9fh6scw9). The repository can be cited as:
+
+<em>Belussi, Alberto; Migliorini, Sara; Eldawy, Ahmed (2023), "A Generic Machine Learning Model for Spatial Query Optimization based on Spatial Embeddings (Datasets)", Mendeley Data, V1, doi: 10.17632/zp9fh6scw9.1</em>
  
 ## Datasets:
 ### Synthetic datasets:
