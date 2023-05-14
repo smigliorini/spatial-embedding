@@ -1,9 +1,9 @@
 # Spatial embeddings project 
 
 ## Mendeley Repository
-Datasets, training sets and trained models can be downloaded from a [Mendeley Data Repository](https://data.mendeley.com/datasets/zp9fh6scw9). The repository can be cited as:
+Datasets, training sets and trained models can be downloaded from a [Mendeley Data Repository](https://data.mendeley.com/datasets/zp9fh6scw9/2). The repository can be cited as:
 
-<em>Belussi, Alberto; Migliorini, Sara; Eldawy, Ahmed (2023), "A Generic Machine Learning Model for Spatial Query Optimization based on Spatial Embeddings (Datasets)", Mendeley Data, V1, doi: 10.17632/zp9fh6scw9.1</em>
+<em>Belussi, Alberto; Migliorini, Sara; Eldawy, Ahmed (2023), "A Generic Machine Learning Model for Spatial Query Optimization based on Spatial Embeddings (Datasets)", Mendeley Data, V2, doi: 10.17632/zp9fh6scw9.2</em>
  
 ## Datasets:
 ### Synthetic datasets:
@@ -32,9 +32,9 @@ Datasets, training sets and trained models can be downloaded from a [Mendeley Da
 	- folder generatedTSet: it contains some files representing the numpy array for training autoEncoders.
 	- folder trainedModels: it contains some already trained autoEncoders.
 3. modelsRQ:
-	- folder gen_py: it contains the Python code for generating the numpy array to be used as input set for training M1.
-	- folder code_py: it contains the Python code for creating and training different types of networks for the estimation of range query selectivity or #MBRTests (M1).
-	- folder generatedTSet: it contains some files representing the numpy array for training models of type M1.
+	- folder gen_py: it contains the Python code for generating the numpy array to be used as input set for training M2.
+	- folder code_py: it contains the Python code for creating and training different types of networks for the estimation of range query selectivity or #MBRTests (M2).
+	- folder generatedTSet: it contains some files representing the numpy array for training models of type M2.
 	- folder trainedModels: it contains some already trained model of type M1.
 4. modelsSJ:
 	- folder gen_py: it contains the Python code for generating the numpy array to be used as input set for training M2.
