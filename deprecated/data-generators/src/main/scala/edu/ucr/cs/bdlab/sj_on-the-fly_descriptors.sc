@@ -1,6 +1,6 @@
-import org.apache.spark.SparkContext
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SparkSession
-
+val conf = new SparkConf()
 val spark: SparkSession = null
 val sc: SparkContext = null
 import edu.ucr.cs.bdlab.beast._
@@ -54,14 +54,14 @@ val outputResults: PrintStream = if (new File(resultFileName).exists()) {
   new PrintStream(new FileOutputStream(resultFileName, true))
 } else {
   val ps = new PrintStream(new FileOutputStream(resultFileName))
-  ps.println("dataset1,datasets2,djresultsize,djmbrTests")
+  ps.println("dataset1,datasets2,cardintality1,cardinality2,djresultsize,selectivity,djmbrTests")
   ps
 }
-
+val maxParallelism = 1
 try {
   val activeJobs = new ArrayBuffer[Future[Unit]]()
   for (pair <- pairs) {
-    while (activeJobs.size > 32) {
+    while (activeJobs.size >= maxParallelism) {
       var i = 0
       while (i < activeJobs.size) {
         try {
@@ -79,16 +79,33 @@ try {
       val dataset2Name = pair.getAs[String](1)
       if (!existingResults.contains((dataset1Name, dataset2Name))) {
         val dataset1 = generateDataset(descriptors(dataset1Name))
+        val cardinality1 = dataset1.count()
         val dataset2 = generateDataset(descriptors(dataset2Name))
+        val cardinality2 = dataset2.count()
         // Run the join and calculate number of MBR tests
-        val dataset1Partitioned = dataset1.spatialPartition(classOf[RSGrovePartitioner], 50)
-        val dataset2Partitioned = dataset2.spatialPartition(classOf[RSGrovePartitioner], 50)
+        val dataset1Partitioned = dataset1.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
+        val dataset2Partitioned = dataset2.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
         val numMBRTests = sc.longAccumulator("mbrTests")
-        val resultSize = SpatialJoin.spatialJoinDJ(dataset1Partitioned, dataset2Partitioned, ESJPredicate.MBRIntersects, numMBRTests).count
+        val resultSize = SpatialJoin.spatialJoinDJ(dataset1Partitioned, dataset2Partitioned, ESJPredicate.Intersects, numMBRTests).count
+        println(Array(dataset1Name, dataset2Name, cardinality1, cardinality2, resultSize,
+          resultSize.toDouble / cardinality1 / cardinality2, numMBRTests.value).mkString(","))
         outputResults.println(Array(dataset1Name, dataset2Name, resultSize, numMBRTests.value).mkString(","))
       }
     }
     activeJobs.append(processor)
+  }
+  // Finish any remaining jobs
+  while (activeJobs.size >= maxParallelism) {
+    var i = 0
+    while (i < activeJobs.size) {
+      try {
+        // Wait at most one second
+        Await.ready(activeJobs(i), Duration.fromNanos(1E9))
+        activeJobs.remove(i)
+      } catch {
+        case _: TimeoutException | _: InterruptedException => i += 1
+      }
+    }
   }
 } finally {
   outputResults.close()
