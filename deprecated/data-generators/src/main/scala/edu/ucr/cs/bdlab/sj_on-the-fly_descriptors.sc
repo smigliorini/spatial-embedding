@@ -1,3 +1,4 @@
+import edu.ucr.cs.bdlab.beast.util.FileUtil
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SparkSession
 val conf = new SparkConf()
@@ -23,6 +24,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import java.io.{BufferedReader, FileReader}
 
+val scale = 10
+
 def generateDataset(descriptor: Row): SpatialRDD = {
   val opts = new BeastOptions()
   for (i <- 0 until descriptor.length; if !descriptor.isNullAt(i)) {
@@ -32,7 +35,7 @@ def generateDataset(descriptor: Row): SpatialRDD = {
     .map(x => (x.toString, x))
     .toMap
   val dataset = sc.generateSpatialData.distribution(distributions(descriptor.getAs[String]("distribution")))
-    .config(opts).generate(descriptor.getAs[String]("cardinality").toLong)
+    .config(opts).generate(descriptor.getAs[String]("cardinality").toLong / scale)
   dataset
 }
 
@@ -54,10 +57,10 @@ val outputResults: PrintStream = if (new File(resultFileName).exists()) {
   new PrintStream(new FileOutputStream(resultFileName, true))
 } else {
   val ps = new PrintStream(new FileOutputStream(resultFileName))
-  ps.println("dataset1,datasets2,cardintality1,cardinality2,djresultsize,selectivity,djmbrTests")
+  ps.println("dataset1,datasets2,cardinality1,cardinality2,djresultsize,selectivity,djmbrTests")
   ps
 }
-val maxParallelism = 1
+val maxParallelism = 32
 try {
   val activeJobs = new ArrayBuffer[Future[Unit]]()
   for (pair <- pairs) {
@@ -87,9 +90,10 @@ try {
         val dataset2Partitioned = dataset2.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
         val numMBRTests = sc.longAccumulator("mbrTests")
         val resultSize = SpatialJoin.spatialJoinDJ(dataset1Partitioned, dataset2Partitioned, ESJPredicate.Intersects, numMBRTests).count
-        println(Array(dataset1Name, dataset2Name, cardinality1, cardinality2, resultSize,
-          resultSize.toDouble / cardinality1 / cardinality2, numMBRTests.value).mkString(","))
-        outputResults.println(Array(dataset1Name, dataset2Name, resultSize, numMBRTests.value).mkString(","))
+        outputResults.synchronized {
+          outputResults.println(Array(dataset1Name, dataset2Name, cardinality1 * scale, cardinality2 * scale, resultSize * scale * scale,
+            resultSize.toDouble / cardinality1 / cardinality2, numMBRTests.value * scale * scale).mkString(","))
+        }
       }
     }
     activeJobs.append(processor)

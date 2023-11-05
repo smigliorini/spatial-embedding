@@ -1,55 +1,96 @@
-import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.{SparkConf, SparkContext}
 
+val conf = new SparkConf
+conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+conf.setAppName("SpatialGenerator")
 
-val sc: SparkContext = null
+// Set Spark master to local if not already set
+if (!conf.contains("spark.master"))
+  conf.setMaster("local[*]")
+
+val spark: SparkSession = SparkSession.builder().config(conf).getOrCreate()
+val sc: SparkContext = spark.sparkContext
+
 import edu.ucr.cs.bdlab.beast._
 
 // Start copying from here
-//sc.readCSVPoint("inputfile.csv", "longitude", "latitude")
-//  .reproject(org.geotools.referencing.CRS.decode("EPSG:3857"), org.geotools.referencing.CRS.decode("EPSG:4326"))
-//  .saveAsCSVPoints("outputfile.csv")
 
+import edu.ucr.cs.bdlab.beast.synopses.BoxCounting
+import java.io.{File, PrintStream}
 import edu.ucr.cs.bdlab.beast.operations.GriddedSummary
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.fs.PathFilter
+import edu.ucr.cs.bdlab.beast.geolite.EnvelopeNDLite
 
 val summariesPath = new Path("real_summaries")
+// Scale all summaries from the world MBR to the scale MBR
+val worldMBR = new EnvelopeNDLite(2, -180, -90, 180, 90)
+val scaleMBR = new EnvelopeNDLite(2, 0, 0, 10, 10)
 //val paths = Array("sj/gap_datasets", "sj/large_datasets", "sj/medium_datasets", "sj/real_datasets", "sj/small_datasets").map(new Path(_))
-val paths = Array(/*"parks_partitioned", */"lakes_partitioned").map(new Path(_))
+val paths = Array("lakes_parks").map(new Path(_))
 val conf = sc.hadoopConfiguration
-for (path <- paths) {
-  val filesystem = path.getFileSystem(conf)
-  val datasets = filesystem.listStatus(path)
-  for (dataset <- datasets) {
-    val summaryPath = new Path(summariesPath, new Path(path.getName, dataset.getPath.getName+"_summary.csv"))
-    if (!filesystem.exists(summaryPath)) {
-      println(s"Summarizing ${dataset.getPath}")
-      try {
-        val tempSummaryPath = new Path(summaryPath.getParent, summariesPath.getName+"_temp")
-        GriddedSummary.run(Seq("separator" -> "\t", "iformat" -> "wkt", "numcells" -> "128,128", "skipheader" -> true),
-          inputs = Array(dataset.getPath.toString),
-          outputs = Array(tempSummaryPath.toString),
-          sc)
-        // Move the file out of the directory
-        val summaryFile = filesystem.listStatus(tempSummaryPath, new PathFilter {
-          override def accept(path: Path): Boolean = path.getName.startsWith("part")
-        })
-        filesystem.rename(summaryFile.head.getPath, summaryPath)
-        filesystem.delete(tempSummaryPath, true)
-      } catch {
-        case _: Exception => System.err.println(s"Error summarizing file '$dataset'")
+val globalSummaryFile = "global-summaries.csv"
+val globalSummaries = new PrintStream(new File(globalSummaryFile))
+globalSummaries.println("dataset,distribution,x1,y1,x2,y2,num_features,size,num_points,avg_area,avg_side_length_0,avg_side_length_1,E0,E2")
+try {
+  for (path <- paths) {
+    val filesystem = path.getFileSystem(conf)
+    val datasets = filesystem.listStatus(path)
+    for (dataset <- datasets) {
+      {
+        // Compute global summary
+        val datasetRDD = sc.readWKTFile(dataset.getPath.toString, 0, skipHeader = true)
+        val summary = datasetRDD.summary
+        // Scale the global summary MBR to fit within the scale MBR
+        for (d <- 0 until summary.getCoordinateDimension) {
+          summary.setMinCoord(d, (summary.getMinCoord(d) - worldMBR.getMinCoord(d)) / worldMBR.getSideLength(d) * scaleMBR.getSideLength(d) + scaleMBR.getMinCoord(d))
+          summary.setMaxCoord(d, (summary.getMaxCoord(d) - worldMBR.getMinCoord(d)) / worldMBR.getSideLength(d) * scaleMBR.getSideLength(d) + scaleMBR.getMinCoord(d))
+        }
+        val bcHistogram = BoxCounting.computeBCHistogram(datasetRDD, 128)
+        val e0 = Math.abs(BoxCounting.boxCounting(bcHistogram, 0))
+        val e2 = BoxCounting.boxCounting(bcHistogram, 2)
+        globalSummaries.println(Array(dataset.getPath, "real", summary.getMinCoord(0), summary.getMinCoord(1),
+          summary.getMaxCoord(0), summary.getMaxCoord(1), summary.numFeatures, summary.size,
+          summary.numPoints, summary.averageArea, summary.averageSideLength(0), summary.averageSideLength(1),
+          e0, e2).mkString(","))
       }
-    } else {
-      println(s"Skipping ${dataset.getPath}")
+      val summaryPath = new Path(summariesPath, new Path(path.getName, dataset.getPath.getName + "_summary.csv"))
+      if (!filesystem.exists(summaryPath)) {
+        println(s"Summarizing ${dataset.getPath}")
+        try {
+          {
+            // Compute local summaries
+            val tempSummaryPath = new Path(summaryPath.getParent, summariesPath.getName + "_temp")
+            GriddedSummary.run(Seq("separator" -> "\t", "iformat" -> "wkt", "numcells" -> "128,128", "skipheader" -> true),
+              inputs = Array(dataset.getPath.toString),
+              outputs = Array(tempSummaryPath.toString),
+              sc)
+            // Move the file out of the directory
+            val summaryFile = filesystem.listStatus(tempSummaryPath, new PathFilter {
+              override def accept(path: Path): Boolean = path.getName.startsWith("part")
+            })
+            filesystem.rename(summaryFile.head.getPath, summaryPath)
+            filesystem.delete(tempSummaryPath, true)
+          }
+        } catch {
+          case _: Exception => System.err.println(s"Error summarizing file '$dataset'")
+        }
+      } else {
+        println(s"Skipping ${dataset.getPath}")
+      }
     }
   }
+} finally {
+  globalSummaries.close()
 }
 
 
 ///////
 import scala.util.Random
 import edu.ucr.cs.bdlab.beast.io.{CSVFeatureWriter, SpatialWriter}
-import edu.ucr.cs.bdlab.beast.generator.{BitDistribution, DiagonalDistribution, DistributionType, GaussianDistribution, ParcelDistribution, SierpinskiDistribution, UniformDistribution}
+import edu.ucr.cs.bdlab.beast.generator.{BitDistribution, DiagonalDistribution, DistributionType, GaussianDistribution,
+  ParcelDistribution, SierpinskiDistribution, UniformDistribution}
 import edu.ucr.cs.bdlab.beast.geolite.EnvelopeNDLite
 
 def randomDouble(random: Random, range: Array[Double]) = {
