@@ -30,13 +30,13 @@ val scaleMBR = new EnvelopeNDLite(2, 0, 0, 10, 10)
 //val paths = Array("sj/gap_datasets", "sj/large_datasets", "sj/medium_datasets", "sj/real_datasets", "sj/small_datasets").map(new Path(_))
 val paths = Array("lakes_parks").map(new Path(_))
 val conf = sc.hadoopConfiguration
-val globalSummaryFile = "global-summaries.csv"
+val globalSummaryFile = "lakesparks-global-summaries.csv"
 val globalSummaries = new PrintStream(new File(globalSummaryFile))
 globalSummaries.println("dataset,distribution,x1,y1,x2,y2,num_features,size,num_points,avg_area,avg_side_length_0,avg_side_length_1,E0,E2")
 try {
   for (path <- paths) {
     val filesystem = path.getFileSystem(conf)
-    val datasets = filesystem.listStatus(path)
+    val datasets = filesystem.listStatus(path).filter(_.getPath.getName.endsWith(".csv"))
     for (dataset <- datasets) {
       {
         // Compute global summary
