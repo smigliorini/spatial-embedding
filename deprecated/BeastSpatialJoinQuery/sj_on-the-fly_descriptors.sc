@@ -99,7 +99,7 @@ try {
     activeJobs.append(processor)
   }
   // Finish any remaining jobs
-  while (activeJobs.size >= maxParallelism) {
+  while (activeJobs.nonEmpty) {
     var i = 0
     while (i < activeJobs.size) {
       try {
