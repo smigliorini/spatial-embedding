@@ -7,41 +7,21 @@ val sc: SparkContext = null
 import edu.ucr.cs.bdlab.beast._
 
 // Start copying from here
-//sc.readCSVPoint("inputfile.csv", "longitude", "latitude")
-//  .reproject(org.geotools.referencing.CRS.decode("EPSG:3857"), org.geotools.referencing.CRS.decode("EPSG:4326"))
-//  .saveAsCSVPoints("outputfile.csv")
 import java.io.{File, FileOutputStream, PrintStream}
 import java.util.concurrent.TimeoutException
 import scala.collection.mutable.ArrayBuffer
 import edu.ucr.cs.bdlab.beast.cg.SpatialJoinAlgorithms.ESJPredicate
 import edu.ucr.cs.bdlab.beast.indexing.RSGrovePartitioner
 import edu.ucr.cs.bdlab.beast.operations.SpatialJoin
-import edu.ucr.cs.bdlab.beast.generator.{BitDistribution, DiagonalDistribution, DistributionType, GaussianDistribution, ParcelDistribution, SierpinskiDistribution, UniformDistribution}
-import edu.ucr.cs.bdlab.beast.common.BeastOptions
-import org.apache.spark.sql.Row
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import java.io.{BufferedReader, FileReader}
 
-val scale = 10
+val scale = 1
 
-def generateDataset(descriptor: Row): SpatialRDD = {
-  val opts = new BeastOptions()
-  for (i <- 0 until descriptor.length; if !descriptor.isNullAt(i)) {
-    opts.set(descriptor.schema(i).name, descriptor.getAs[String](i))
-  }
-  val distributions: Map[String, DistributionType] = Array(UniformDistribution, DiagonalDistribution, GaussianDistribution, BitDistribution, SierpinskiDistribution, ParcelDistribution)
-    .map(x => (x.toString, x))
-    .toMap
-  val dataset = sc.generateSpatialData.distribution(distributions(descriptor.getAs[String]("distribution")))
-    .config(opts).generate(descriptor.getAs[String]("cardinality").toLong / scale)
-  dataset
-}
-
-val descriptors: Map[String, Row] = spark.read.json("jn_balanced_rotated_descriptors.json").collect().map(x => (x.getAs[String]("name"), x)).toMap
-val pairs = spark.read.option("delimiter", ",").option("header", true).csv("jn_balanced_2023-01-19-withClasses_rot.csv").select("dataset1", "dataset2").collect
-val resultFileName: String = "sj_results_revision.csv"
+val pairs = spark.read.option("delimiter", ",").option("header", true).csv("realDataset_jn_pairs_rot.csv").select("dataset1", "dataset2").collect
+val resultFileName: String = "sj_real_results_revision.csv"
 var existingResults: Array[(String, String)] = Array()
 val outputResults: PrintStream = if (new File(resultFileName).exists()) {
   val file = new BufferedReader(new FileReader(resultFileName))
@@ -78,22 +58,27 @@ try {
     }
 
     val processor: Future[Unit] = Future {
-      val dataset1Name = pair.getAs[String](0)
-      val dataset2Name = pair.getAs[String](1)
-      if (!existingResults.contains((dataset1Name, dataset2Name))) {
-        val dataset1 = generateDataset(descriptors(dataset1Name))
-        val cardinality1 = dataset1.count()
-        val dataset2 = generateDataset(descriptors(dataset2Name))
-        val cardinality2 = dataset2.count()
-        // Run the join and calculate number of MBR tests
-        val dataset1Partitioned = dataset1.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
-        val dataset2Partitioned = dataset2.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
-        val numMBRTests = sc.longAccumulator("mbrTests")
-        val resultSize = SpatialJoin.spatialJoinDJ(dataset1Partitioned, dataset2Partitioned, ESJPredicate.Intersects, numMBRTests).count
-        outputResults.synchronized {
-          outputResults.println(Array(dataset1Name, dataset2Name, cardinality1 * scale, cardinality2 * scale, resultSize * scale * scale,
-            resultSize.toDouble / cardinality1 / cardinality2, numMBRTests.value * scale * scale).mkString(","))
+      try {
+        val dataset1Name = pair.getAs[String](0)
+        val dataset2Name = pair.getAs[String](1)
+        if (!existingResults.contains((dataset1Name, dataset2Name))) {
+          val dataset1 = sc.readWKTFile(s"lakes_parks/$dataset1Name", "geometry")
+          val cardinality1 = dataset1.count()
+          val dataset2 = sc.readWKTFile(s"lakes_parks/$dataset2Name", "geometry")
+          val cardinality2 = dataset2.count()
+          // Run the join and calculate number of MBR tests
+          val dataset1Partitioned = dataset1.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
+          val dataset2Partitioned = dataset2.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
+          val numMBRTests = sc.longAccumulator("mbrTests")
+          val resultSize = SpatialJoin.spatialJoinDJ(dataset1Partitioned, dataset2Partitioned, ESJPredicate.MBRIntersects, numMBRTests).filter(
+            pair => try {pair._1.getGeometry.intersects(pair._2.getGeometry)} catch {case e: org.locationtech.jts.geom.TopologyException => false}).count()
+          outputResults.synchronized {
+            outputResults.println(Array(dataset1Name, dataset2Name, cardinality1 * scale, cardinality2 * scale, resultSize * scale * scale,
+              resultSize.toDouble / cardinality1 / cardinality2, numMBRTests.value * scale * scale).mkString(","))
+          }
         }
+      } catch {
+        case e: Throwable => e.printStackTrace()
       }
     }
     activeJobs.append(processor)
@@ -114,3 +99,4 @@ try {
 } finally {
   outputResults.close()
 }
+:quit
