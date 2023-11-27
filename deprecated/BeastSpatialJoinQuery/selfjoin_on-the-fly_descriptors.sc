@@ -9,6 +9,7 @@ import edu.ucr.cs.bdlab.beast._
 //sc.readCSVPoint("inputfile.csv", "longitude", "latitude")
 //  .reproject(org.geotools.referencing.CRS.decode("EPSG:3857"), org.geotools.referencing.CRS.decode("EPSG:4326"))
 //  .saveAsCSVPoints("outputfile.csv")
+import edu.ucr.cs.bdlab.beast.geolite.EnvelopeNDLite
 import edu.ucr.cs.bdlab.beast.geolite.IFeature
 import org.apache.hadoop.util.{IndexedSortable, QuickSort}
 import org.locationtech.jts.geom.Envelope
@@ -83,9 +84,11 @@ try {
         val cardinality = dataset.count()
         // Run the join and calculate number of MBR tests
         val datasetPartitioned = dataset.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
+        val partitioner = datasetPartitioned.getSpatialPartitioner
         val numMBRTests = sc.longAccumulator("mbrTests")
-        val joinResults = datasetPartitioned.mapPartitions(features => {
+        val joinResults = datasetPartitioned.mapPartitionsWithIndex((id, features) => {
           val fs: Array[IFeature] = features.toArray
+          val refPointMBR: EnvelopeNDLite = partitioner.getPartitionMBR(id)
           // Calculate MBRs of features
           val mbrs: Array[Envelope] = fs.map(_.getGeometry.getEnvelopeInternal)
           // Sort features and MBRs by x1
@@ -109,8 +112,12 @@ try {
             var i2: Int = i1 + 1
             while (i2 < fs.length && mbrs(i2).getMinX < mbrs(i1).getMaxX) {
               numMBRTests.add(1)
-              if (mbrs(i1).intersects(mbrs(i2)) && fs(i1).getGeometry.intersects(fs(i2).getGeometry))
-                results.append((fs(i1), fs(i2)))
+              if (mbrs(i1).intersects(mbrs(i2))) {
+                val refPointX: Double = mbrs(i1).getMinX max mbrs(i2).getMinX
+                val refPointY: Double = mbrs(i1).getMinY max mbrs(i2).getMinY
+                if (refPointMBR.containsPoint(Array(refPointX, refPointY)) && fs(i1).getGeometry.intersects(fs(i2).getGeometry))
+                  results.append((fs(i1), fs(i2)))
+              }
               i2 += 1
             }
             i1 += 1
