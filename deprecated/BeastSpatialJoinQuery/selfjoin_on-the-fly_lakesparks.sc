@@ -12,32 +12,18 @@ import edu.ucr.cs.bdlab.beast._
 import java.io.{File, FileOutputStream, PrintStream}
 import java.util.concurrent.TimeoutException
 import scala.collection.mutable.ArrayBuffer
-import edu.ucr.cs.bdlab.beast.generator.{BitDistribution, DiagonalDistribution, DistributionType, GaussianDistribution, ParcelDistribution, SierpinskiDistribution, UniformDistribution}
-import edu.ucr.cs.bdlab.beast.common.BeastOptions
-import org.apache.spark.sql.Row
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import java.io.{BufferedReader, FileReader}
 import edu.ucr.cs.bdlab.beast.cg.SpatialJoinAlgorithms.ESJPredicate
+import org.apache.hadoop.fs.Path
 
-val scale = 10
-
-def generateDataset(descriptor: Row): SpatialRDD = {
-  val opts = new BeastOptions()
-  for (i <- 0 until descriptor.length; if !descriptor.isNullAt(i)) {
-    opts.set(descriptor.schema(i).name, descriptor.getAs[String](i))
-  }
-  val distributions: Map[String, DistributionType] = Array(UniformDistribution, DiagonalDistribution, GaussianDistribution, BitDistribution, SierpinskiDistribution, ParcelDistribution)
-    .map(x => (x.toString, x))
-    .toMap
-  val dataset = sc.generateSpatialData.distribution(distributions(descriptor.getAs[String]("distribution")))
-    .config(opts).generate(descriptor.getAs[String]("cardinality").toLong / scale)
-  dataset
-}
-
-val descriptors: Map[String, Row] = spark.read.json("jn_balanced_rotated_descriptors.json").collect().map(x => (x.getAs[String]("name"), x)).toMap
-val resultFileName: String = "selfjoin_results_revision.csv"
+val scale = 1
+val datasetPath = new Path("lakes_parks")
+val fs = datasetPath.getFileSystem(sc.hadoopConfiguration)
+val files = fs.listStatus(datasetPath).map(_.getPath)
+val resultFileName: String = "selfjoin_real_revision.csv"
 var existingResults: Array[String] = Array()
 val outputResults: PrintStream = if (new File(resultFileName).exists()) {
   val file = new BufferedReader(new FileReader(resultFileName))
@@ -59,7 +45,7 @@ val outputResults: PrintStream = if (new File(resultFileName).exists()) {
 val maxParallelism = 1
 try {
   val activeJobs = new ArrayBuffer[Future[Unit]]()
-  for (descriptor <- descriptors) {
+  for (file <- files) {
     while (activeJobs.size >= maxParallelism) {
       var i = 0
       while (i < activeJobs.size) {
@@ -74,11 +60,11 @@ try {
     }
 
     val processor: Future[Unit] = Future {
-      val datasetName = descriptor._1
+      val datasetName = file.getName
       if (!existingResults.contains(datasetName)) {
-        val dataset = generateDataset(descriptor._2)
+        val dataset = sc.readWKTFile(file.toString, "geometry").repartition(50)
         val cardinality = dataset.count()
-        // Run the join and calculate number of MBR tests
+        // Run the self join and calculate number of MBR tests
         val numMBRTests = sc.longAccumulator("mbrTests")
         val joinResults = edu.ucr.cs.bdlab.beast.operations.SpatialJoin.selfJoinDJ(dataset, ESJPredicate.Intersects)
         val resultSize = joinResults.count()

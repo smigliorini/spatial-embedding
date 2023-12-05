@@ -75,6 +75,7 @@ try {
           outputResults.synchronized {
             outputResults.println(Array(dataset1Name, dataset2Name, cardinality1 * scale, cardinality2 * scale, resultSize * scale * scale,
               resultSize.toDouble / cardinality1 / cardinality2, numMBRTests.value * scale * scale).mkString(","))
+            outputResults.flush()
           }
         }
       } catch {
