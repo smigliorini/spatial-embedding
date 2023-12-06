@@ -53,10 +53,10 @@ val outputResults: PrintStream = if (new File(resultFileName).exists()) {
   new PrintStream(new FileOutputStream(resultFileName, true))
 } else {
   val ps = new PrintStream(new FileOutputStream(resultFileName))
-  ps.println("dataset,cardinality,selfjoin_resultsize,selectivity,selfjoinMBRTests")
+  ps.println("dataset,cardinality,selfjoin_resultsize,selectivity,selfjoinMBRTests,SelectivityAnalytical,DJCostAnalytical")
   ps
 }
-val maxParallelism = 1
+val maxParallelism = 32
 try {
   val activeJobs = new ArrayBuffer[Future[Unit]]()
   for (descriptor <- descriptors) {
@@ -77,14 +77,27 @@ try {
       val datasetName = descriptor._1
       if (!existingResults.contains(datasetName)) {
         val dataset = generateDataset(descriptor._2)
+          .spatialPartition(classOf[edu.ucr.cs.bdlab.beast.indexing.RSGrovePartitioner], 50, "disjoint"->true)
         val cardinality = dataset.count()
         // Run the join and calculate number of MBR tests
         val numMBRTests = sc.longAccumulator("mbrTests")
-        val joinResults = edu.ucr.cs.bdlab.beast.operations.SpatialJoin.selfJoinDJ(dataset, ESJPredicate.Intersects)
-        val resultSize = joinResults.count()
+        val resultSize = edu.ucr.cs.bdlab.beast.operations.SpatialJoin.selfJoinDJ(dataset, ESJPredicate.Intersects, numMBRTests).count()
+        // Compute the cost using the analytical query found in https://doi.org/10.1007/s10707-020-00414-x
+        val summary: edu.ucr.cs.bdlab.beast.synopses.Summary = dataset.summary
+        val selectivityEstimation: Double = edu.ucr.cs.bdlab.beast.synopses.Summary.spatialJoinSelectivityEstimation(summary, summary)
+        val partitionStats: Array[edu.ucr.cs.bdlab.beast.synopses.Summary] = dataset.spatialPartition(classOf[edu.ucr.cs.bdlab.beast.indexing.RSGrovePartitioner])
+          .mapPartitions(fs => Some(fs.summary).iterator).collect()
+        var estimatedCostAnalytical: Double = 0.0
+        for (p <- partitionStats) {
+          // Compute selectivity of the result and use as an approximation for number of MBR tests
+          val selectivity = edu.ucr.cs.bdlab.beast.synopses.Summary.spatialJoinSelectivityEstimation(p, p)
+          // Calculate the cost of planesweep between the two partitions p1 and p2 using Estimate 3 (Section 5) in the paper
+          val numMBRTests = p.numFeatures * p.numFeatures * selectivity
+          estimatedCostAnalytical += numMBRTests
+        }
         outputResults.synchronized {
           outputResults.println(Array(datasetName, cardinality * scale, resultSize * scale * scale,
-            resultSize.toDouble / cardinality / cardinality, numMBRTests.value * scale * scale).mkString(","))
+            resultSize.toDouble / cardinality / cardinality, numMBRTests.value * scale * scale, selectivityEstimation, estimatedCostAnalytical * scale * scale).mkString(","))
         }
       }
     }

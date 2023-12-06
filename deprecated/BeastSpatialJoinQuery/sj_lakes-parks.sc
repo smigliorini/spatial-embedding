@@ -37,7 +37,7 @@ val outputResults: PrintStream = if (new File(resultFileName).exists()) {
   new PrintStream(new FileOutputStream(resultFileName, true))
 } else {
   val ps = new PrintStream(new FileOutputStream(resultFileName))
-  ps.println("dataset1,datasets2,cardinality1,cardinality2,djresultsize,selectivity,djmbrTests")
+  ps.println("dataset1,datasets2,cardinality1,cardinality2,djresultsize,selectivity,djmbrTests,SelectivityAnalytical,DJCostAnalytical")
   ps
 }
 val maxParallelism = 32
@@ -70,12 +70,25 @@ try {
           val dataset1Partitioned = dataset1.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
           val dataset2Partitioned = dataset2.spatialPartition(classOf[RSGrovePartitioner], 50, "disjoint" -> true)
           val numMBRTests = sc.longAccumulator("mbrTests")
-          val resultSize = SpatialJoin.spatialJoinDJ(dataset1Partitioned, dataset2Partitioned, ESJPredicate.MBRIntersects, numMBRTests).filter(
-            pair => try {pair._1.getGeometry.intersects(pair._2.getGeometry)} catch {case e: org.locationtech.jts.geom.TopologyException => false}).count()
+          val resultSize = edu.ucr.cs.bdlab.beast.operations.SpatialJoin.spatialJoinDJ(dataset1Partitioned, dataset2Partitioned, ESJPredicate.Intersects, numMBRTests).count()
+          // Compute the cost using the analytical query found in https://doi.org/10.1007/s10707-020-00414-x
+          val summary1: edu.ucr.cs.bdlab.beast.synopses.Summary = dataset1.summary
+          val summary2: edu.ucr.cs.bdlab.beast.synopses.Summary = dataset2.summary
+          val selectivityEstimation: Double = edu.ucr.cs.bdlab.beast.synopses.Summary.spatialJoinSelectivityEstimation(summary1, summary2)
+          val partitionStats1: Array[edu.ucr.cs.bdlab.beast.synopses.Summary] = dataset1Partitioned.mapPartitions(fs => Some(fs.summary).iterator).collect()
+          val partitionStats2: Array[edu.ucr.cs.bdlab.beast.synopses.Summary] = dataset2Partitioned.mapPartitions(fs => Some(fs.summary).iterator).collect()
+          var estimatedCostAnalytical: Double = 0.0
+          for (p1 <- partitionStats1; p2 <- partitionStats2 if p1.intersectsEnvelope(p2)) {
+            // Compute selectivity of the result and use as an approximation for number of MBR tests
+            val selectivity = edu.ucr.cs.bdlab.beast.synopses.Summary.spatialJoinSelectivityEstimation(p1, p2)
+            // Calculate the cost of planesweep between the two partitions p1 and p2 using Estimate 3 (Section 5) in the paper
+            val numMBRTests = p1.numFeatures * p2.numFeatures * selectivity
+            estimatedCostAnalytical += numMBRTests
+          }
+
           outputResults.synchronized {
             outputResults.println(Array(dataset1Name, dataset2Name, cardinality1 * scale, cardinality2 * scale, resultSize * scale * scale,
-              resultSize.toDouble / cardinality1 / cardinality2, numMBRTests.value * scale * scale).mkString(","))
-            outputResults.flush()
+              resultSize.toDouble / cardinality1 / cardinality2, numMBRTests.value * scale * scale, selectivityEstimation, estimatedCostAnalytical * scale * scale).mkString(","))
           }
         }
       } catch {
