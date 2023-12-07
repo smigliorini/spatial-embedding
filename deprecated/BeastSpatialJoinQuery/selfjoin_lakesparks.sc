@@ -39,7 +39,7 @@ val outputResults: PrintStream = if (new File(resultFileName).exists()) {
   new PrintStream(new FileOutputStream(resultFileName, true))
 } else {
   val ps = new PrintStream(new FileOutputStream(resultFileName))
-  ps.println("dataset,cardinality,selfjoin_resultsize,selectivity,selfjoinMBRTests")
+  ps.println("dataset,cardinality,selfjoin_resultsize,selectivity,selfjoinMBRTests,SelectivityAnalytical,DJCostAnalytical")
   ps
 }
 val maxParallelism = 32
