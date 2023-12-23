@@ -101,8 +101,8 @@ try {
           val dataset2 = generateDataset(datasetDescriptors(dataset2Name))
           val cardinality2 = dataset2.count()
           // Run the join and calculate number of MBR tests
-          val dataset1Partitioned = IndexHelper.partitionFeatures2(dataset1, classOf[RSGrovePartitioner], _.getStorageSize, "disjoint" -> true)
-          val dataset2Partitioned = IndexHelper.partitionFeatures2(dataset2, classOf[RSGrovePartitioner], _.getStorageSize, "disjoint" -> true)
+          val dataset1Partitioned = IndexHelper.partitionFeatures2(dataset1, classOf[RSGrovePartitioner], _.getStorageSize, Seq("disjoint" -> true, IndexHelper.PartitionCriterionThreshold -> "Size(16m)"))
+          val dataset2Partitioned = IndexHelper.partitionFeatures2(dataset2, classOf[RSGrovePartitioner], _.getStorageSize, Seq("disjoint" -> true, IndexHelper.PartitionCriterionThreshold -> "Size(16m)"))
           val algorithms = Seq(SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ,
             SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM,
             SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ,
@@ -127,11 +127,11 @@ try {
           outputResults.synchronized {
             outputResults.println(Array(dataset1Name, dataset2Name, cardinality1 * scale, cardinality2 * scale,
               processingTimes(0)._1 * scale * scale, processingTimes(0)._1.toDouble / cardinality1 / cardinality2,
-              processingTimes(0)._2 * 1E-9, processingTimes(0)._3 * scale * scale,
-              processingTimes(1)._2 * 1E-9, processingTimes(1)._3 * scale * scale,
-              processingTimes(2)._2 * 1E-9, processingTimes(2)._3 * scale * scale,
-              processingTimes(3)._2 * 1E-9, processingTimes(3)._3 * scale * scale,
-              processingTimes(4)._2 * 1E-9, processingTimes(4)._3 * scale * scale,
+              processingTimes(0)._3 * 1E-9, processingTimes(0)._2 * scale * scale,
+              processingTimes(1)._3 * 1E-9, processingTimes(1)._2 * scale * scale,
+              processingTimes(2)._3 * 1E-9, processingTimes(2)._2 * scale * scale,
+              processingTimes(3)._3 * 1E-9, processingTimes(3)._2 * scale * scale,
+              processingTimes(4)._3 * 1E-9, processingTimes(4)._2 * scale * scale,
             ).mkString(","))
           }
         }
