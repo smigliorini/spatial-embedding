@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 import java.util.Date;
 
 /**
- * Execute the spatial joins between the datsets and estract form the logs the statistical information needed.
+ * Execute the spatial joins between the datasets and extract form the logs the statistical information needed.
  */
 public class SJMaster {
     private final ArrayList<String> datasets1;
@@ -223,7 +223,7 @@ public class SJMaster {
 
         long start = System.currentTimeMillis();
         sjResults = SpatialJoin.spatialJoin(envelope1, envelope2, esjPredicate,
-                SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ, mbr, null, new BeastOptions());
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ, mbr, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
         singleResults.addJoinResult(JoinAlgorithms.BNLJ, extractSingleSJ(start, mbr.count()));
         baos.reset();
@@ -237,7 +237,7 @@ public class SJMaster {
 
         long start = System.currentTimeMillis();
         sjResults = SpatialJoin.spatialJoin(envelope1, envelope2, esjPredicate,
-                SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM, mbr, null, new BeastOptions());
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM, mbr, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
         singleResults.addJoinResult(JoinAlgorithms.PBSM, extractSingleSJ(start, mbr.count()));
         baos.reset();
@@ -250,7 +250,7 @@ public class SJMaster {
 
         long start = System.currentTimeMillis();
         sjResults = SpatialJoin.spatialJoin(envelope1_par, envelope2_par, esjPredicate,
-                SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ, mbr, null, new BeastOptions());
+                SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ, mbr, new BeastOptions());
         singleResults.setResultSJSize(sjResults.count());
         singleResults.addJoinResult(JoinAlgorithms.DJ, extractSingleSJ(start, mbr.count()));
         baos.reset();
@@ -265,11 +265,11 @@ public class SJMaster {
         if (envelope1.count() > envelope2.count()) {
             baos.reset();
             sjResults = SpatialJoin.spatialJoin(envelope1_par, envelope2, esjPredicate,
-                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, null, new BeastOptions());
+                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
         } else {
             baos.reset();
             sjResults = SpatialJoin.spatialJoin(envelope2_par, envelope1, esjPredicate,
-                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, null, new BeastOptions());
+                    SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ, mbr, new BeastOptions());
         }
         singleResults.setResultSJSize(sjResults.count());
         singleResults.addJoinResult(JoinAlgorithms.REPJ, extractSingleSJ(start, mbr.count()));
