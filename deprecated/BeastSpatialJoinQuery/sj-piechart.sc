@@ -108,6 +108,7 @@ try {
             SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ,
             SpatialJoinAlgorithms.ESJDistributedAlgorithm.SJ1D,
             SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ)
+          var minTime: Long = Long.MaxValue
           val processingTimes: Seq[(Long, Long, Long)] = algorithms.map(algorithm => {
             val numMBRTests = sc.longAccumulator("mbrTests")
             val inputs = algorithm match {
@@ -118,9 +119,21 @@ try {
               case SpatialJoinAlgorithms.ESJDistributedAlgorithm.BNLJ => (dataset1, dataset2)
             }
             val t1 = System.nanoTime()
-            val resultSize = edu.ucr.cs.bdlab.beast.operations.SpatialJoin.spatialJoin(inputs._1, inputs._2,
-              ESJPredicate.MBRIntersects, algorithm, numMBRTests).count()
+            var resultSize: Long = -1
+            val resultSizeF: org.apache.spark.FutureAction[Long] = edu.ucr.cs.bdlab.beast.operations.SpatialJoin.spatialJoin(inputs._1, inputs._2,
+              ESJPredicate.MBRIntersects, algorithm, numMBRTests).countAsync()
+            while ((System.nanoTime() - t1) / 2 < minTime && resultSize == -1) {
+              try {
+                resultSize = Await.result(resultSizeF, Duration.fromNanos(1E9))
+              } catch {
+                case _: TimeoutException | _: InterruptedException =>
+              }
+            }
             val t2 = System.nanoTime()
+            if (resultSize >= 0)
+              minTime = minTime min (t2 - t1)
+            else
+              resultSizeF.cancel()
             (resultSize, numMBRTests.value.toLong, t2 - t1)
           })
           // "dataset1,datasets2,cardinality1,cardinality2,sjresultsize,selectivity,djTime,djMBRTests,pbsmTime,pbsmMBRTests,repJTime,repJMBRTests,sj1dTime,sj1dMBRTests,bnljTime,bnljMBRTests"
