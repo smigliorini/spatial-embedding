@@ -77,7 +77,7 @@ val outputResults: PrintStream = if (new File(resultFileName).exists()) {
 val maxParallelism = 1
 try {
   val activeJobs = new ArrayBuffer[Future[Unit]]()
-  pairs = pairs.sortWith((_,_) => Math.random() < 0.5)
+  pairs = pairs.map(x => (Math.random(), x)).sortWith((x1, x2) => x1._1 < x2._1).map(x => x._2)
   for (pair <- pairs) {
     while (activeJobs.size >= maxParallelism) {
       var i = 0
@@ -97,16 +97,25 @@ try {
         val dataset1Name = pair.getAs[String](0)
         val dataset2Name = pair.getAs[String](1)
         if (!existingResults.contains((dataset1Name, dataset2Name))) {
-          val dataset1 = generateDataset(datasetDescriptors(dataset1Name))
-          val dataset2 = generateDataset(datasetDescriptors(dataset2Name))
+          sc.setJobGroup("persist", s"Persisting datasets $dataset1Name &#8904; $dataset2Name")
+          val dataset1: SpatialRDD = generateDataset(datasetDescriptors(dataset1Name))
+          dataset1.setName(dataset1Name)
+          val dataset2: SpatialRDD = generateDataset(datasetDescriptors(dataset2Name))
+          dataset2.setName(dataset2Name)
           // Run the join and calculate number of MBR tests
           val dataset1Partitioned = IndexHelper.partitionFeatures2(dataset1, classOf[RSGrovePartitioner], _.getStorageSize, Seq("disjoint" -> true, IndexHelper.PartitionCriterionThreshold -> "Size(16m)"))
+          dataset1Partitioned.setName(s"${dataset1Name}_partitioned")
           val dataset2Partitioned = IndexHelper.partitionFeatures2(dataset2, classOf[RSGrovePartitioner], _.getStorageSize, Seq("disjoint" -> true, IndexHelper.PartitionCriterionThreshold -> "Size(16m)"))
+          dataset2Partitioned.setName(s"${dataset2Name}_partitioned")
           // Persist all datasets to disregard their creation time
-          val cardinality1 = dataset1.persist().count()
-          val cardinality2 = dataset2.persist().count()
-          dataset1Partitioned.persist().count()
-          dataset2Partitioned.persist().count()
+          val pers1f = dataset1.persist().countAsync()
+          val pers2f = dataset2.persist().countAsync()
+          val pers3f = dataset1Partitioned.persist().countAsync()
+          val pers4f = dataset2Partitioned.persist().countAsync()
+          val cardinality1: Long = Await.result(pers1f, Duration.fromNanos(1000E9))
+          val cardinality2: Long = Await.result(pers2f, Duration.fromNanos(1000E9))
+          Await.result(pers3f, Duration.fromNanos(1000E9))
+          Await.result(pers4f, Duration.fromNanos(1000E9))
           // Try all algorithms in this order
           val algorithms = Seq(SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ,
             SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM,
@@ -125,6 +134,7 @@ try {
             }
             val t1 = System.nanoTime()
             var resultSize: Long = -1
+            sc.setJobGroup("process", s"Processing $dataset1Name &#8904; $dataset2Name with $algorithm")
             val resultSizeF: org.apache.spark.FutureAction[Long] = edu.ucr.cs.bdlab.beast.operations.SpatialJoin.spatialJoin(inputs._1, inputs._2,
               ESJPredicate.MBRIntersects, algorithm, numMBRTests).countAsync()
             while ((System.nanoTime() - t1) / 2 < minTime && resultSize == -1) {
