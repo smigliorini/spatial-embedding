@@ -19,14 +19,14 @@ import edu.ucr.cs.bdlab.beast.common.BeastOptions
 import edu.ucr.cs.bdlab.beast.generator.{BitDistribution, DiagonalDistribution, DistributionType, GaussianDistribution, ParcelDistribution, SierpinskiDistribution, UniformDistribution}
 import edu.ucr.cs.bdlab.beast.cg.SpatialJoinAlgorithms
 import edu.ucr.cs.bdlab.beast.indexing.IndexHelper
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
 val scale = 1
 
 val datasetsPath: String = "../tvu032/datasets/sjml/"
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
 def jsonToMap(jsonString: String): Map[String, Any] = {
   val mapper = new ObjectMapper() with ScalaObjectMapper
@@ -49,7 +49,7 @@ def generateDataset(descriptor: Map[String, Any]): SpatialRDD = {
   }
 }
 
-val pairs = spark.read.option("delimiter", ",").option("header", true).csv("sj-piechart-pairs.csv").select("dataset1", "dataset2").collect
+var pairs = spark.read.option("delimiter", ",").option("header", true).csv("sj-piechart-pairs.csv").select("dataset1", "dataset2").collect
 val datasetDescriptors: Map[String, Map[String, Any]] = sc.textFile("sj-piechart-descriptors.json").collect.map(d => {
   val map = jsonToMap(d)
   val name = map("name").asInstanceOf[String]
@@ -77,6 +77,7 @@ val outputResults: PrintStream = if (new File(resultFileName).exists()) {
 val maxParallelism = 1
 try {
   val activeJobs = new ArrayBuffer[Future[Unit]]()
+  pairs = pairs.sortWith((_,_) => Math.random() < 0.5)
   for (pair <- pairs) {
     while (activeJobs.size >= maxParallelism) {
       var i = 0
@@ -97,12 +98,16 @@ try {
         val dataset2Name = pair.getAs[String](1)
         if (!existingResults.contains((dataset1Name, dataset2Name))) {
           val dataset1 = generateDataset(datasetDescriptors(dataset1Name))
-          val cardinality1 = dataset1.count()
           val dataset2 = generateDataset(datasetDescriptors(dataset2Name))
-          val cardinality2 = dataset2.count()
           // Run the join and calculate number of MBR tests
           val dataset1Partitioned = IndexHelper.partitionFeatures2(dataset1, classOf[RSGrovePartitioner], _.getStorageSize, Seq("disjoint" -> true, IndexHelper.PartitionCriterionThreshold -> "Size(16m)"))
           val dataset2Partitioned = IndexHelper.partitionFeatures2(dataset2, classOf[RSGrovePartitioner], _.getStorageSize, Seq("disjoint" -> true, IndexHelper.PartitionCriterionThreshold -> "Size(16m)"))
+          // Persist all datasets to disregard their creation time
+          val cardinality1 = dataset1.persist().count()
+          val cardinality2 = dataset2.persist().count()
+          dataset1Partitioned.persist().count()
+          dataset2Partitioned.persist().count()
+          // Try all algorithms in this order
           val algorithms = Seq(SpatialJoinAlgorithms.ESJDistributedAlgorithm.DJ,
             SpatialJoinAlgorithms.ESJDistributedAlgorithm.PBSM,
             SpatialJoinAlgorithms.ESJDistributedAlgorithm.REPJ,
@@ -130,11 +135,13 @@ try {
               }
             }
             val t2 = System.nanoTime()
-            if (resultSize >= 0)
+            if (resultSize >= 0) {
               minTime = minTime min (t2 - t1)
-            else
+              (resultSize, numMBRTests.value.toLong, t2 - t1)
+            } else {
               resultSizeF.cancel()
-            (resultSize, numMBRTests.value.toLong, t2 - t1)
+              (resultSize, -1L, minTime * 10)
+            }
           })
           // "dataset1,datasets2,cardinality1,cardinality2,sjresultsize,selectivity,djTime,djMBRTests,pbsmTime,pbsmMBRTests,repJTime,repJMBRTests,sj1dTime,sj1dMBRTests,bnljTime,bnljMBRTests"
           outputResults.synchronized {
@@ -147,6 +154,10 @@ try {
               processingTimes(4)._3 * 1E-9, processingTimes(4)._2 * scale * scale,
             ).mkString(","))
           }
+          dataset1.unpersist()
+          dataset2.unpersist()
+          dataset1Partitioned.unpersist()
+          dataset2Partitioned.unpersist()
         }
       } catch {
         case e: Throwable => e.printStackTrace()
